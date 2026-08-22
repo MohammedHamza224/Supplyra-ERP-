@@ -1,0 +1,663 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Cairo:wght@400;500;600&family=Tajawal:wght@400;500;600&display=swap');
+
+.dashboardContainer,
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 0;
+  animation: fadeIn 0.4s ease-out;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.headerSection,
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.welcomeText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.welcomeTitle,
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.welcomeSubtitle,
+.subtitle {
+  font-family: 'IBM Plex Sans Arabic', 'Cairo', 'Tajawal', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  margin: 0;
+}
+
+.dateDisplay {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--color-primary);
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.headerActions,
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.iconBtn:hover {
+  background: var(--color-background-alt);
+  border-color: var(--color-primary);
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+/* Period Summary Box */
+.periodSummaryBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.98) 0%, rgba(240, 253, 244, 0.85) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-inline-start: 4px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  min-width: 320px;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+
+.periodSummaryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  padding-bottom: 6px;
+  gap: 10px;
+}
+
+.periodSummaryTitle {
+  font-size: 0.875rem;
+  color: #064e3b;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.periodSummaryBadge {
+  font-size: 0.75rem;
+  color: #334155;
+  font-weight: 600;
+  background-color: rgba(241, 245, 249, 0.9);
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.periodSummaryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.periodChip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  background-color: #ffffff;
+  border-radius: 6px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.periodChipLabel {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.periodChipValueSales {
+  font-weight: 800;
+  color: #047857;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.periodChipValuePurchases {
+  font-weight: 800;
+  color: #2563eb;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.periodChipValueProfitPos {
+  font-weight: 800;
+  color: #059669;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.periodChipValueProfitNeg {
+  font-weight: 800;
+  color: #dc2626;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.periodChipValueOrders {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  text-decoration: none;
+}
+
+.actionBtn:hover {
+  background: var(--color-background-alt);
+  border-color: var(--color-primary-light);
+}
+
+.actionBtnPrimary {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.actionBtnPrimary:hover {
+  background: var(--color-primary-dark);
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.kpiCard {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kpiCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.kpiIconWrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: white;
+}
+
+.kpiInfo {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.kpiValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.kpiLabel {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.kpiTrend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kpiTrend.positive { color: #10b981; }
+.kpiTrend.neutral { color: #6b7280; }
+.kpiTrend.negative { color: #ef4444; }
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cardSection {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alertsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alertItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--color-background-alt);
+  border: 1px solid var(--color-border);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.2s;
+}
+
+.alertItem:hover {
+  background: var(--color-hover);
+}
+
+.alertInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  color: var(--color-text-primary);
+}
+
+.alertCount {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.alertCount.danger { color: #ef4444; }
+.alertCount.warning { color: #f59e0b; }
+.alertCount.info { color: #3b82f6; }
+
+.quickActionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.quickActionBtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.quickActionBtn:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transform: translateY(-2px);
+}
+
+.quickActionIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.recentActivityTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.recentActivityTable th {
+  text-align: right;
+  padding: 12px 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+html[dir="ltr"] .recentActivityTable th {
+  text-align: left;
+}
+
+.recentActivityTable td {
+  padding: 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.recentActivityTable tr:last-child td {
+  border-bottom: none;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.statusCompleted { background: #d1fae5; color: #065f46; }
+.statusPending { background: #fef3c7; color: #92400e; }
+.statusCancelled { background: #fee2e2; color: #991b1b; }
+
+.filterSelect {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: white;
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+}
+
+.chartContainer {
+  width: 100%;
+  height: 300px;
+  margin-top: 16px;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  gap: 12px;
+}
+
+/* =========================================================================
+   DASHBOARD-SCOPED DARK MODE OVERRIDES (Applies ONLY on [data-theme='dark'])
+   ========================================================================= */
+:global([data-theme='dark']) .dashboardContainer,
+:global([data-theme='dark']) .container {
+  color: var(--color-text-primary);
+}
+
+:global([data-theme='dark']) .welcomeTitle,
+:global([data-theme='dark']) .title {
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .welcomeSubtitle,
+:global([data-theme='dark']) .subtitle {
+  color: #94a3b8;
+}
+
+:global([data-theme='dark']) .filterGroup {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+:global([data-theme='dark']) .iconBtn {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .iconBtn:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
+}
+
+:global([data-theme='dark']) .periodSummaryBox {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(6, 78, 59, 0.35) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-inline-start: 4px solid #10b981;
+  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.4);
+}
+
+:global([data-theme='dark']) .periodSummaryHeader {
+  border-bottom-color: rgba(51, 65, 85, 0.8);
+}
+
+:global([data-theme='dark']) .periodSummaryTitle {
+  color: #34d399;
+}
+
+:global([data-theme='dark']) .periodSummaryBadge {
+  color: #e2e8f0;
+  background-color: rgba(15, 23, 42, 0.7);
+  border-color: rgba(71, 85, 105, 0.7);
+}
+
+:global([data-theme='dark']) .periodChip {
+  background-color: rgba(15, 23, 42, 0.7);
+  border-color: rgba(51, 65, 85, 0.85);
+  box-shadow: none;
+}
+
+:global([data-theme='dark']) .periodChipLabel {
+  color: #94a3b8;
+}
+
+:global([data-theme='dark']) .periodChipValueSales {
+  color: #34d399;
+}
+
+:global([data-theme='dark']) .periodChipValuePurchases {
+  color: #60a5fa;
+}
+
+:global([data-theme='dark']) .periodChipValueProfitPos {
+  color: #34d399;
+}
+
+:global([data-theme='dark']) .periodChipValueProfitNeg {
+  color: #f87171;
+}
+
+:global([data-theme='dark']) .periodChipValueOrders {
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .kpiCard {
+  background: var(--color-surface);
+  border-color: rgba(51, 65, 85, 0.85);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+:global([data-theme='dark']) .kpiValue {
+  color: #ffffff;
+}
+
+:global([data-theme='dark']) .kpiLabel {
+  color: #cbd5e1;
+}
+
+:global([data-theme='dark']) .kpiTrend.neutral {
+  color: #94a3b8;
+}
+
+:global([data-theme='dark']) .cardSection {
+  background: var(--color-surface);
+  border-color: rgba(51, 65, 85, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+:global([data-theme='dark']) .sectionTitle {
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .filterSelect {
+  background: var(--color-surface-hover);
+  color: #f8fafc;
+  border-color: var(--color-border);
+}
+
+:global([data-theme='dark']) .quickActionBtn {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .quickActionBtn:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
+}
+
+:global([data-theme='dark']) .actionBtn {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .actionBtn:hover {
+  background: var(--color-surface-hover);
+}
+
+:global([data-theme='dark']) .recentActivityTable th {
+  color: #cbd5e1;
+  border-bottom-color: var(--color-border);
+}
+
+:global([data-theme='dark']) .recentActivityTable td {
+  color: #f8fafc;
+  border-bottom-color: var(--color-border);
+}
+
+:global([data-theme='dark']) .alertItem {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
+}
+
+:global([data-theme='dark']) .alertInfo {
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .emptyState {
+  color: #94a3b8;
+}

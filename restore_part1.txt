@@ -1,0 +1,343 @@
+-        // Update product_suppliers
+-        if (!error) {
+-          // First, delete existing ones that are not in formData.supplier_ids
+-          await supabase.from('product_suppliers').delete().eq('product_id', editingId);
+-          // Then insert new ones
+-          if (formData.supplier_ids && formData.supplier_ids.length > 0) {
+-            const inserts = formData.supplier_ids.map((sId: string, index: number) => ({
+-              product_id: editingId,
+-              supplier_id: sId,
+-              is_preferred: index === 0 // First selected is preferred
+-            }));
+-            await supabase.from('product_suppliers').insert(inserts);
+-          }
+-        }
+-
+-      } else {
+-        const { data, error: insertError } = await supabase
+-          .from('products')
+-          .insert({
+-            product_code: formData.product_code.trim(),
+-            name: formData.name.trim(),
+-            category_id: formData.category_id || null,
+-            brand_id: formData.brand_id || null,
+-            unit_id: formData.unit_id,
+-            barcode: formData.barcode.trim() || null,
+-            purchase_price: purchasePrice,
+-            selling_price: sellingPrice,
+-            min_stock: minStock,
+-            active: true,
+-            created_by: user.id,
+-            updated_by: user.id,
+-          }).select().single();
+-        error = insertError;
+-        newProduct = data;
+-        
+-        // Insert product_suppliers
+-        if (!error && newProduct && formData.supplier_ids && formData.supplier_ids.length > 0) {
+-          const inserts = formData.supplier_ids.map((sId: string, index: number) => ({
+-            product_id: newProduct.id,
+-            supplier_id: sId,
+-            is_preferred: index === 0
+-          }));
+-          await supabase.from('product_suppliers').insert(inserts);
+-        }
+-        
+-        // Handle initial batch if provided
+-        if (!error && newProduct && Number(formData.initial_quantity) > 0 && formData.warehouse_id && formData.batch_number && formData.expiry_date) {
+-          const { error: batchError } = await supabase.from('inventory_batches').insert([{
+-            product_id: newProduct.id,
+-            warehouse_id: formData.warehouse_id,
+-            batch_number: formData.batch_number,
+-            production_date: formData.production_date || null,
+-            expiry_date: formData.expiry_date,
+-            quantity: Number(formData.initial_quantity)
+-          }]);
+-          if (batchError) console.error('Failed to add initial batch:', batchError);
+-        }
+-
+-        // STEP 10: MOST IMPORTANT TEST
+-        if (newProduct) {
+-          console.log('CREATED PRODUCT ID:', newProduct.id);
+-          const { data: verifyProduct, error: verifyError } = await supabase
+-            .from('products')
+-            .select('*')
+-            .eq('id', newProduct.id)
+-            .single();
+-          console.log('VERIFY CREATED PRODUCT:', verifyProduct);
+-          console.log('VERIFY ERROR:', verifyError);
+-        }
+-      }
+-
+-      if (error) {
+-        if (error.code === '23505') {
+-          if (error.message.includes('product_code')) {
+-            setFormError('Product Code already exists.');
+-          } else if (error.message.includes('barcode')) {
+-            setFormError('Barcode already exists.');
+-          } else {
+-            setFormError('A product with the same unique value already exists.');
+-          }
+-        } else {
+-          setFormError(error.message);
+-        }
+-
+-        return;
+-      }
+-
+-      // Clear search filter to ensure the new product isn't hidden by an active search
+-      setSearchTerm('');
+-
+-      // Refresh products from Supabase
+-      await fetchProducts();
+-
+-      // Close modal after successful insert
+-      setShowModal(false);
+-
+-      setFormData({
+-        product_code: '',
+-        name: '',
+-        category_id: '',
+-        brand_id: '',
+-        unit_id: '',
+-          supplier_ids: [],
+-          barcode: '',
+-        purchase_price: '',
+-        selling_price: '',
+-        min_stock: '',
+-        warehouse_id: '',
+-        batch_number: '',
+-        production_date: '',
+-        expiry_date: '',
+-        initial_quantity: '',
+-      });
+-    } catch (error: any) {
+-      console.error('Error adding product:', error);
+-      setFormError(error?.message || 'Failed to add product.');
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
+-
+-  if (!hasPermission('products.view')) {
+-    return <div className="p-6 text-red-500">You do not have permission to view products.</div>;
+-  }
+-
+-  return (
+-    <div className="page-container">
+-      <div className="card">
+-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+-            <Package size={28} color="var(--color-primary)" />
+-            <div>
+-              <h2 style={{ fontSize: '1.25rem', marginBottom: '4px', margin: 0 }}>
+-                {t('products.title')}
+-              </h2>
+-              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>
+-                {t('products.subtitle')}
+-              </p>
+-            </div>
+-          </div>
+-
+-          {hasPermission('products.create') && (
+-            <button
+-              className="btn btn-primary"
+-              onClick={() => openModal()}
+-              type="button"
+-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+-            >
+-              <Plus size={18} />
+-              {t('products.newProduct')}
+-            </button>
+-          )}
+-        </div>
+-
+-        <div className="card-body">
+-          <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+-            <thead>
+-              <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left' }}>
+-                <th style={{ padding: '12px' }}>{t('products.code')}</th>
+-                <th style={{ padding: '12px' }}>{t('products.name')}</th>
+-                <th style={{ padding: '12px' }}>{t('products.category')}</th>
+-                <th style={{ padding: '12px' }}>{t('products.brand')}</th>
+-                  <th style={{ padding: '12px' }}>{t('products.supplier')}</th>
+-                <th style={{ padding: '12px' }}>{t('products.price')}</th>
+-                <th style={{ padding: '12px' }}>{t('products.status')}</th>
+-                <th style={{ padding: '12px' }}>{t('products.actions')}</th>
+-              </tr>
+-            </thead>
+-            <tbody>
+-              {products.map((product) => (
+-                <tr key={product.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+-                  <td style={{ padding: '12px' }}>{product.product_code}</td>
+-                  <td style={{ padding: '12px', fontWeight: 500 }}>{product.name}</td>
+-                  <td style={{ padding: '12px' }}>{product.category?.name || '-'}</td>
+-                  <td style={{ padding: '12px' }}>{product.brand?.name || '-'}</td>
+-                  <td style={{ padding: '12px' }}>
+-                    {(() => {
+-                      const ps = product.product_suppliers || [];
+-                      if (ps.length === 0) return '-';
+-                      const primary = ps.find((s: any) => s.is_preferred) || ps[0];
+-                      const name = primary?.suppliers?.name || '-';
+-                      return ps.length > 1 ? `${name} +${ps.length - 1}` : name;
+-                    })()}
+-                  </td>
+-                  <td style={{ padding: '12px', direction: 'ltr', textAlign: 'left' }}>{Number(product.selling_price).toFixed(2)} {t('products.currency')}</td>
+-                  <td style={{ padding: '12px' }}>
+-                    <span
+-                      style={{
+-                        padding: '4px 8px',
+-                        borderRadius: '12px',
+-                        fontSize: '0.75rem',
+-                        fontWeight: 500,
+-                        backgroundColor: product.active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+-                        color: product.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)',
+-                      }}
+-                    >
+-                      {product.active ? t('products.active') : t('products.inactive')}
+-                    </span>
+-                  </td>
+-                  <td style={{ padding: '12px', textAlign: 'right' }}>
+-                    {hasPermission('products.update') && (
+-                      <button 
+-                        className="btn btn-secondary" 
+-                        style={{ padding: '6px', marginRight: '4px' }} 
+-                        onClick={() => openModal(product)}
+-                        title={t('products.edit')}
+-                      >
+-                        <Edit2 size={16} />
+-                      </button>
+-                    )}
+-                    {hasPermission('products.update') && (
+-                      <button 
+-                        className="btn btn-secondary" 
+-                        style={{ padding: '6px', marginRight: '4px' }} 
+-                        onClick={() => navigate('/inventory?product_id=' + product.id)}
+-                        title={t('products.manageStock')}
+-                      >
+-                        <Package size={16} />
+-                      </button>
+-                    )}
+-                    {hasPermission('products.delete') && (
+-                      <button 
+-                        type="button"
+-                        className={`btn ${product.active ? 'btn-secondary' : 'btn-success'}`} 
+-                        style={{ padding: '6px', marginRight: '4px' }} 
+-                        onClick={() => handleDeactivate(product.id, product.active)}
+-                        title={product.active ? t('products.deactivate') : t('products.activate')}
+-                      >
+-                        {product.active ? <XCircle size={16} /> : <CheckCircle size={16} />}
+-                      </button>
+-                    )}
+-                    {hasPermission('products.delete') && (
+-                      <button 
+-                        type="button"
+-                        className="btn btn-danger" 
+-                        style={{ padding: '6px' }} 
+-                        onClick={() => handleDelete(product.id)}
+-                        title={t('common.delete')}
+-                      >
+-                        <Trash2 size={16} />
+-                      </button>
+-                    )}
+-                  </td>
+-                </tr>
+-              ))}
+-              {products.length === 0 && (
+-                <tr>
+-                  <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+-                    {t('products.noProducts')}
+-                  </td>
+-                </tr>
+-              )}
+-            </tbody>
+-          </table>
+-        </div>
+-      </div>
+-
+-      {/* Modal */}
+-      {showModal && (
+-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+-          <div className="card" style={{ width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)' }}>
+-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
+-              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{editingId ? t('products.edit') : t('products.newProduct')}</h3>
+-              <button onClick={closeModal} className="btn btn-icon" style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+-            </div>
+-            
+-            <form onSubmit={handleAddProduct}>
+-              <div
+-                className="card-body"
+-                style={{
+-                  display: 'flex',
+-                  flexDirection: 'column',
+-                  gap: '12px',
+-                  padding: '16px 20px',
+-                }}
+-              >
+-                {formError && (
+-                  <div
+-                    style={{
+-                      padding: '8px 12px',
+-                      borderRadius: 'var(--radius-md)',
+-                      backgroundColor: '#fee2e2',
+-                      color: '#b91c1c',
+-                      fontSize: '0.85rem',
+-                    }}
+-                  >
+-                    {formError}
+-                  </div>
+-                )}
+-
+-                {/* Row 1: Name & Code */}
+-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+-                  <div>
+-                    <label htmlFor="name" style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('products.name')} *</label>
+-                    <input
+-                      id="name"
+-                      name="name"
+-                      value={formData.name}
+-                      onChange={handleInputChange}
+-                      placeholder={t('products.placeholderName')}
+-                      required
+-                      style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', outline: 'none', fontSize: '0.85rem' }}
+-                    />
+-                  </div>
+-                  <div>
+-                    <label htmlFor="product_code" style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('products.code')} *</label>
+-                    <input
+-                      id="product_code"
+-                      name="product_code"
+-                      value={formData.product_code}
+-                      onChange={handleInputChange}
+-                      placeholder={t('products.placeholderCode')}
+-                      required
+-                      style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', outline: 'none', fontSize: '0.85rem' }}
+-                    />
+-                  </div>
+-                </div>
+-
+-                {/* Row 2: Category, Brand, Unit, Supplier */}
+-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+-                  <div>
+-                    <label htmlFor="category_id" style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('products.category')}</label>
+-                    <LOVSelect
+-                      options={categories}
+-                      value={formData.category_id}
+-                      onChange={(val) => setFormData({ ...formData, category_id: val })}
+-                      placeholder={t('products.selectCategory')}
+-                      searchPlaceholder={t('common.search')}
+-                    />
+-                  </div>
+-                  <div>
+-                    <label htmlFor="brand_id" style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('products.brand')}</label>
+-                    <LOVSelect
+-                      options={brands}
+-                      value={formData.brand_id}
+-                      onChange={(val) => setFormData({ ...formData, brand_id: val })}
+-                      placeholder={t('products.selectBrand')}
+-                      searchPlaceholder={t('common.search')}
+-                    />
+-                  </div>
+-                  <div>
+-                    <label htmlFor="supplier_ids" style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('products.supplier')}</label>
+-                    <LOVSelect

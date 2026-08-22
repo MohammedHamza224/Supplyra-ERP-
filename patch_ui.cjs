@@ -1,0 +1,46 @@
+const fs = require('fs');
+
+let content = fs.readFileSync('src/pages/sales/SalesForm.tsx', 'utf8');
+
+const oldDiscountUI = `                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>{t('sales.discount')}:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.discount}
+                      onChange={(e) => setFormData({ ...formData, discount: Number(e.target.value) })}
+                      style={{ width: '80px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', textAlign: 'right', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>`;
+
+const newDiscountUI = `                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>{isRtl ? 'الخصم (%)' : 'Discount (%)'}:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={formData.discount_percentage}
+                      onChange={(e) => {
+                        let val = Number(e.target.value);
+                        if (val < 0) val = 0;
+                        if (val > 100) val = 100;
+                        setFormData({ ...formData, discount_percentage: val });
+                      }}
+                      style={{ width: '80px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', textAlign: 'right', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>{isRtl ? 'قيمة الخصم' : 'Discount Amount'}:</span>
+                    <span style={{ fontWeight: 500, color: '#ef4444' }}>- {discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2})} {t('products.currency')}</span>
+                  </div>`;
+
+content = content.replace(oldDiscountUI, newDiscountUI);
+
+// Let's also check grand total label
+const oldGrandTotal = `<span style={{ color: 'var(--color-text-muted)' }}>{t('sales.grandTotal')}:</span>`;
+const newGrandTotal = `<span style={{ color: 'var(--color-text-muted)' }}>{isRtl ? 'الصافي' : 'Net Total'}:</span>`;
+content = content.replace(oldGrandTotal, newGrandTotal);
+
+fs.writeFileSync('src/pages/sales/SalesForm.tsx', content);

@@ -1,0 +1,304 @@
+import React, { useState, useEffect } from 'react';
+import { useTranslation } from '../../contexts/LanguageContext';
+import { Plus, Search, Eye, Filter, Edit2, FileText, CheckCircle, XCircle, ShoppingBag, Trash2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import PurchaseForm from './PurchaseForm';
+import PurchaseDetails from './PurchaseDetails';
+import { useDebounce } from '../../hooks/useDebounce';
+
+const PurchasesList = () => {
+  const { t, language } = useTranslation();
+  const { hasPermission } = useAuth();
+  
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteTargetPurchase, setDeleteTargetPurchase] = useState<any>(null);
+  const [deleteErrorMsg, setDeleteErrorMsg] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const fetchPurchases = async () => {
+    try {
+      setLoading(true);
+      
+      let query = supabase
+        .from('purchases')
+        .select(`
+          *,
+          supplier:suppliers(name),
+          warehouse:warehouses(name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (debouncedSearchTerm) {
+        query = query.or(`purchase_number.ilike.%${debouncedSearchTerm}%,invoice_number.ilike.%${debouncedSearchTerm}%`);
+      }
+
+      const { data, error: fetchError } = await query;
+      
+      if (fetchError) throw fetchError;
+      setPurchases(data || []);
+    } catch (err: any) {
+      console.error('Error fetching purchases:', err);
+      setError('Failed to load purchases.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPurchases();
+  }, [debouncedSearchTerm]);
+
+  const handleCreate = () => {
+    setSelectedPurchase(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEdit = (purchase: any) => {
+    setSelectedPurchase(purchase);
+    setIsFormOpen(true);
+  };
+
+  const handleView = (purchase: any) => {
+    setSelectedPurchase(purchase);
+    setIsDetailsOpen(true);
+  };
+
+  const confirmDeleteClick = (purchase: any) => {
+    setDeleteConfirmId(purchase.id);
+    setDeleteTargetPurchase(purchase);
+    setDeleteErrorMsg('');
+  };
+
+  const executeDelete = async () => {
+    if (!deleteConfirmId) return;
+    setDeleting(true);
+    setDeleteErrorMsg('');
+    try {
+      const { error: delError } = await supabase.from('purchases').delete().eq('id', deleteConfirmId);
+      if (delError) {
+        const { error: updError } = await supabase.from('purchases').update({ status: 'CANCELLED' }).eq('id', deleteConfirmId);
+        if (updError) throw delError;
+      }
+      setDeleteConfirmId(null);
+      setDeleteTargetPurchase(null);
+      fetchPurchases();
+    } catch (e: any) {
+      setDeleteErrorMsg(e.message || (language === 'ar' ? 'فشل حذف الفاتورة' : 'Failed to delete purchase invoice'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'DRAFT': return { bg: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' };
+      case 'ORDERED': return { bg: 'rgba(59, 130, 246, 0.15)', color: '#1e40af' };
+      case 'PARTIALLY_RECEIVED': return { bg: '#fef08a', color: '#854d0e' };
+      case 'RECEIVED': return { bg: '#dcfce3', color: '#166534' };
+      case 'CANCELLED': return { bg: 'rgba(239, 68, 68, 0.15)', color: '#991b1b' };
+      default: return { bg: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' };
+    }
+  };
+
+  return (
+    <div className="page-container">
+      <div className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <ShoppingBag size={28} color="var(--color-primary)" />
+            <div>
+              <h2 style={{ fontSize: '1.25rem', marginBottom: '4px', margin: 0 }}>
+                {t('purchases.title')}
+              </h2>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>
+                {t('purchases.subtitle')}
+              </p>
+            </div>
+          </div>
+          {hasPermission('purchases.create') && (
+            <button 
+              className="btn btn-primary"
+              onClick={handleCreate}
+              type="button"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <Plus size={18} />
+              {t('purchases.newPurchase')}
+            </button>
+          )}
+        </div>
+
+        <div className="card-body" style={{ padding: 0 }}>
+          <div style={{ padding: 'var(--spacing-4)', borderBottom: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 12px', width: '300px' }}>
+              <Search size={16} color="var(--color-text-muted)" />
+              <input 
+                type="text" 
+                placeholder={t('purchases.search')}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ border: 'none', background: 'transparent', padding: '8px', width: '100%', outline: 'none', fontSize: '0.875rem' }}
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div style={{ padding: '16px', color: '#ef4444', backgroundColor: '#fef2f2', borderBottom: '1px solid #fecaca' }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
+                  <th style={{ padding: '12px' }}>{t('purchases.purchaseNumber')}</th>
+                  <th style={{ padding: '12px' }}>{t('purchases.invoiceNumber')}</th>
+                  <th style={{ padding: '12px' }}>{t('purchases.supplier')}</th>
+                  <th style={{ padding: '12px' }}>{t('purchases.warehouse')}</th>
+                  <th style={{ padding: '12px' }}>{t('purchases.date')}</th>
+                  <th style={{ padding: '12px' }}>{t('purchases.total')}</th>
+                  <th style={{ padding: '12px' }}>{t('purchases.status')}</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                    {t('common.loading')}
+                  </td>
+                </tr>
+              ) : purchases.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                    {t('purchases.noPurchases')}
+                  </td>
+                </tr>
+              ) : (
+                purchases.map((purchase) => {
+                  const statusStyle = getStatusStyle(purchase.status);
+                  
+                  return (
+                    <tr key={purchase.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '12px', fontWeight: 500 }}>{purchase.purchase_number || '-'}</td>
+                      <td style={{ padding: '12px' }}>{purchase.invoice_number || '-'}</td>
+                      <td style={{ padding: '12px' }}>{purchase.supplier?.name || '-'}</td>
+                      <td style={{ padding: '12px' }}>{purchase.warehouse?.name || '-'}</td>
+                      <td style={{ padding: '12px' }}>{purchase.purchase_date ? new Date(purchase.purchase_date).toLocaleDateString() : '-'}</td>
+                      <td style={{ padding: '12px', fontWeight: 500 }}>{Number(purchase.grand_total || purchase.subtotal || 0).toLocaleString()} {t('products.currency')}</td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ 
+                          display: 'inline-block', padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500,
+                          backgroundColor: statusStyle.bg, color: statusStyle.color, width: 'fit-content'
+                        }}>
+                          {t(`purchases.${purchase.status.toLowerCase()}`) || purchase.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <button 
+                            onClick={() => handleView(purchase)}
+                            className="btn btn-secondary"
+                            title={language === 'ar' ? 'عرض الفاتورة' : 'View Details'}
+                            style={{ padding: '6px' }}
+                          >
+                            <Eye size={16} />
+                          </button>
+                          {hasPermission('purchases.update') && (
+                            <button 
+                              onClick={() => handleEdit(purchase)}
+                              className="btn btn-secondary"
+                              title={language === 'ar' ? 'تعديل الفاتورة' : 'Edit Invoice'}
+                              style={{ padding: '6px' }}
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                          )}
+                          {(hasPermission('purchases.cancel') || hasPermission('purchases.update')) && (
+                            <button 
+                              onClick={() => confirmDeleteClick(purchase)}
+                              className="btn btn-danger"
+                              title={language === 'ar' ? 'حذف الفاتورة' : 'Delete Invoice'}
+                              style={{ padding: '6px' }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      {isFormOpen && (
+        <PurchaseForm 
+          purchaseId={selectedPurchase?.id}
+          onClose={() => setIsFormOpen(false)} 
+          onSave={() => {
+            setIsFormOpen(false);
+            fetchPurchases();
+          }} 
+        />
+      )}
+
+      {isDetailsOpen && selectedPurchase && (
+        <PurchaseDetails 
+          purchaseId={selectedPurchase.id}
+          onClose={() => setIsDetailsOpen(false)}
+          onRefresh={() => fetchPurchases()}
+        />
+      )}
+
+      {deleteConfirmId && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)' }}>
+            <div className="card-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--color-text-primary)' }}>{t('common.confirmDelete')}</h3>
+            </div>
+            <div className="card-body" style={{ padding: '20px' }}>
+              <p style={{ margin: '0 0 16px 0', fontSize: '1rem', color: 'var(--color-text-secondary)' }}>
+                {language === 'ar' 
+                  ? `هل أنت متأكد من حذف/إلغاء فاتورة المشتريات #${deleteTargetPurchase?.purchase_number || deleteConfirmId}؟`
+                  : `Are you sure you want to delete/cancel purchase invoice #${deleteTargetPurchase?.purchase_number || deleteConfirmId}?`}
+              </p>
+              {deleteErrorMsg && (
+                <div style={{ padding: '10px 14px', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#dc2626', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '16px' }}>
+                  {deleteErrorMsg}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setDeleteConfirmId(null); setDeleteTargetPurchase(null); }} disabled={deleting}>
+                  {t('common.cancel')}
+                </button>
+                <button type="button" className="btn btn-danger" onClick={executeDelete} disabled={deleting}>
+                  {deleting ? t('common.loading') : (language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PurchasesList;
