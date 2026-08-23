@@ -158,7 +158,8 @@ const SalesList = () => {
       case 'PENDING': return { bg: '#fef08a', color: '#854d0e', text: 'sales.pendingApproval' };
       case 'APPROVED': return { bg: '#dcfce3', color: '#166534', text: 'sales.approved' };
       case 'REJECTED': return { bg: 'rgba(239, 68, 68, 0.15)', color: '#991b1b', text: 'sales.rejected' };
-      default: return null;
+      case 'NONE': return { bg: '#dcfce3', color: '#166534', text: 'sales.approved' };
+      default: return { bg: '#dcfce3', color: '#166534', text: 'sales.approved' };
     }
   };
 
@@ -349,7 +350,7 @@ const SalesList = () => {
                             }}>
                               {t(`sales.${sale.status?.toLowerCase()}`) || sale.status}
                             </span>
-                            {aStyle && sale.discount_approval_status !== 'NONE' && (
+                            {aStyle && (
                               <div style={{ marginTop: '4px' }}>
                                 <span style={{ 
                                   display: 'inline-block', padding: '2px 6px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 600,

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../../contexts/LanguageContext';
-import { X, FileText, CheckCircle, XCircle, Printer, Calendar, Clock, User, Building2, CreditCard, DollarSign, Package, Trash2 } from 'lucide-react';
+import { X, FileText, CheckCircle, XCircle, Printer, Calendar, Clock, User, Building2, CreditCard, DollarSign, Package, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { printInvoice } from '../../utils/printInvoice';
 import { useAuth } from '../../contexts/AuthContext';
+import DiscountApprovalModal from './DiscountApprovalModal';
 
 interface SaleDetailsProps {
   saleId: string;
@@ -19,6 +20,7 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
   const [error, setError] = useState('');
   
   const [sale, setSale] = useState<any>(null);
@@ -320,19 +322,60 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
 
                 <div>
                   <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>
-                    {isRtl ? 'حالة الفاتورة والدفع' : 'Order & Payment Status'}
+                    {isRtl ? 'حالة الفاتورة والدفع والخصم' : 'Order, Payment & Approval Status'}
                   </span>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <span className={`badge ${sale.status === 'COMPLETED' ? 'badge-success' : sale.status === 'CANCELLED' ? 'badge-danger' : 'badge-neutral'}`}>
+                    <span className={`badge ${sale.status === 'COMPLETED' || sale.status === 'CONFIRMED' ? 'badge-success' : sale.status === 'CANCELLED' ? 'badge-danger' : 'badge-neutral'}`}>
                       {sale.status}
                     </span>
                     <span className={`badge ${sale.payment_status === 'PAID' ? 'badge-success' : sale.payment_status === 'PARTIALLY_PAID' ? 'badge-warning' : 'badge-neutral'}`}>
                       {sale.payment_status}
                     </span>
+                    <span style={{
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      backgroundColor: sale.discount_approval_status === 'PENDING' ? '#fef08a' : sale.discount_approval_status === 'REJECTED' ? 'rgba(239, 68, 68, 0.15)' : '#dcfce3',
+                      color: sale.discount_approval_status === 'PENDING' ? '#854d0e' : sale.discount_approval_status === 'REJECTED' ? '#991b1b' : '#166534'
+                    }}>
+                      {sale.discount_approval_status === 'PENDING'
+                        ? (isRtl ? 'في انتظار الموافقة' : 'Pending Approval')
+                        : sale.discount_approval_status === 'REJECTED'
+                        ? (isRtl ? 'تم الرفض' : 'Rejected')
+                        : (isRtl ? 'تمت الموافقة' : 'Approved')}
+                    </span>
                   </div>
                 </div>
 
               </div>
+
+              {/* Discount Approval Pending / Rejected Banner */}
+              {sale.discount_approval_status === 'PENDING' && (
+                <div style={{ backgroundColor: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400e', fontWeight: 600, fontSize: '0.9rem' }}>
+                    <AlertTriangle size={20} color="#d97706" />
+                    <span>{isRtl ? 'هذه الفاتورة بانتظار موافقة المدير على الخصم (يتجاوز 5%)' : 'This invoice is pending Manager approval for discount > 5%'}</span>
+                  </div>
+                  {hasPermission('sales.discount.approve') && (
+                    <button
+                      onClick={() => setIsApprovalModalOpen(true)}
+                      className="btn"
+                      style={{ backgroundColor: '#d97706', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <ShieldCheck size={16} />
+                      {isRtl ? 'مراجعة واعتماد الخصم' : 'Review & Approve Discount'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {sale.discount_approval_status === 'REJECTED' && (
+                <div style={{ backgroundColor: '#fee2e2', border: '1px solid #ef4444', borderRadius: '8px', padding: '10px 14px', color: '#991b1b', fontWeight: 600, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <XCircle size={18} color="#dc2626" />
+                  <span>{isRtl ? 'تم رفض طلب الخصم لهذه الفاتورة من قبل المدير.' : 'Discount request for this invoice was rejected by Manager.'}</span>
+                </div>
+              )}
 
               {/* 2. Items Table Section */}
               <div>
@@ -513,6 +556,19 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
         </div>
 
       </div>
+
+      {isApprovalModalOpen && saleId && (
+        <DiscountApprovalModal
+          orderId={saleId}
+          isOpen={isApprovalModalOpen}
+          onClose={() => setIsApprovalModalOpen(false)}
+          onSuccess={() => {
+            setIsApprovalModalOpen(false);
+            fetchSaleDetails();
+            onUpdate();
+          }}
+        />
+      )}
     </div>
   );
 };

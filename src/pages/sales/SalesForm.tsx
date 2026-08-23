@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../../contexts/LanguageContext';
-import { X, Plus, Trash2, Save, ShoppingCart, CheckCircle, Printer } from 'lucide-react';
+import { X, Plus, Trash2, Save, ShoppingCart, CheckCircle, Printer, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { printInvoice } from '../../utils/printInvoice';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,7 +18,8 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
   const isRtl = language === 'ar';
   const { user, hasPermission } = useAuth();
   const [loading, setLoading] = useState(false);
-    const [successOrder, setSuccessOrder] = useState<any>(null);
+  const [successOrder, setSuccessOrder] = useState<any>(null);
+  const [pendingApprovalOrder, setPendingApprovalOrder] = useState<any>(null);
   const [error, setError] = useState('');
   
   const [customers, setCustomers] = useState<any[]>([]);
@@ -50,12 +51,13 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
   useEffect(() => {
     fetchMasterData();
     if (sale) {
+      const calcPct = sale.subtotal && sale.discount ? Number(((sale.discount / sale.subtotal) * 100).toFixed(2)) : 0;
       setFormData({
         customer_id: typeof sale.customer_id === 'object' ? sale.customer_id?.id : (sale.customer_id || ''),
         warehouse_id: typeof sale.warehouse_id === 'object' ? sale.warehouse_id?.id : (sale.warehouse_id || ''),
         order_date: sale.order_date ? sale.order_date.split('T')[0] : (sale.created_at ? sale.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
         notes: sale.notes || '',
-        discount_percentage: sale.subtotal && sale.discount ? (sale.discount / sale.subtotal) * 100 : 0,
+        discount_percentage: calcPct,
         discount: sale.discount || 0,
         discountReason: sale.discount_reason || '',
         tax: sale.tax || 0,
@@ -88,77 +90,62 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
         supabase.from('warehouses').select('id, name').eq('active', true),
         supabase.from('products').select('id, name, selling_price').eq('active', true)
       ]);
+
       setCustomers(custRes.data || []);
       setWarehouses(wareRes.data || []);
       setProducts(prodRes.data || []);
+
+      const { data: batchesData } = await supabase
+        .from('inventory_batches')
+        .select('product_id, warehouse_id, quantity, active, warehouse:warehouses(id, name)')
+        .eq('active', true);
+
+      const mapping: Record<string, { id: string, name: string, qty: number }[]> = {};
+      (batchesData || []).forEach((b: any) => {
+        const pId = b.product_id;
+        const wId = b.warehouse_id;
+        const wName = Array.isArray(b.warehouse) ? b.warehouse[0]?.name : (b.warehouse?.name || 'Warehouse');
+        const qty = Number(b.quantity || 0);
+
+        if (!mapping[pId]) mapping[pId] = [];
+        const existing = mapping[pId].find(w => w.id === wId);
+        if (existing) {
+          existing.qty += qty;
+        } else {
+          mapping[pId].push({ id: wId, name: wName, qty });
+        }
+      });
+      setStockMap(mapping);
+
+      if (formData.warehouse_id && !sale) {
+        setItems(prev => prev.map(it => ({ ...it, warehouse_id: formData.warehouse_id })));
+      }
     } catch (err) {
       console.error('Error fetching master data', err);
     }
   };
 
-
-  useEffect(() => {
-    const fetchWarehouseStock = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('inventory_batches')
-          .select('product_id, warehouse_id, quantity, warehouse:warehouses(name)')
-          .eq('active', true)
-          .gte('expiry_date', new Date().toISOString().split('T')[0]);
-        
-        if (error) throw error;
-        
-        const newStockMap: Record<string, { id: string, name: string, qty: number }[]> = {};
-        (data || []).forEach(batch => {
-          const pid = batch.product_id;
-          const wid = batch.warehouse_id;
-          const wname = ((batch.warehouse as any)?.name || (Array.isArray(batch.warehouse) ? (batch.warehouse as any)[0]?.name : undefined)) || 'Unknown';
-          if (!newStockMap[pid]) newStockMap[pid] = [];
-          
-          const existing = newStockMap[pid].find(w => w.id === wid);
-          if (existing) {
-             existing.qty += Number(batch.quantity);
-          } else {
-             newStockMap[pid].push({ id: wid, name: wname, qty: Number(batch.quantity) });
-          }
-        });
-        setStockMap(newStockMap as any);
-      } catch (err) {
-        console.error('Error fetching stock', err);
-      }
-    };
-    fetchWarehouseStock();
-  }, []);
-
   const handleItemChange = (index: number, field: string, value: any) => {
     const newItems = [...items];
     newItems[index][field] = value;
-    
+
     if (field === 'product_id') {
-      if (value) {
-        const selectedProduct = products.find(p => p.id === value);
-        if (selectedProduct) {
-          newItems[index].unit_price = selectedProduct.selling_price || 0;
-        }
-        // Auto select warehouse if only 1
-        const availableWarehouses = stockMap[value] || [];
-        if (availableWarehouses.length === 1) {
-          newItems[index].warehouse_id = availableWarehouses[0].id;
-        } else {
-          newItems[index].warehouse_id = '';
+      const prod = products.find(p => p.id === value);
+      if (prod) {
+        newItems[index].unit_price = prod.selling_price || 0;
+        const pStocks = stockMap[value] || [];
+        if (pStocks.length === 1) {
+          newItems[index].warehouse_id = pStocks[0].id;
+        } else if (pStocks.length > 1) {
+          const currentFormWarehouse = formData.warehouse_id;
+          const matchWh = pStocks.find(w => w.id === currentFormWarehouse);
+          newItems[index].warehouse_id = matchWh ? matchWh.id : pStocks[0].id;
         }
       } else {
         newItems[index].warehouse_id = '';
       }
     }
     
-    // Validation for quantity
-    if (field === 'quantity' || field === 'warehouse_id' || field === 'product_id') {
-       // We can just clamp or allow user to type and show error on submit, 
-       // but user requested to not allow selling more than stock.
-       // We'll handle this in a custom onChange for qty below.
-    }
-
     if (['quantity', 'unit_price', 'product_id'].includes(field)) {
       const qty = Number(newItems[index].quantity) || 0;
       const price = Number(newItems[index].unit_price) || 0;
@@ -179,21 +166,15 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
 
   const calculateSubtotal = () => items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   const subtotal = calculateSubtotal();
-  // Using user requirement: Discount Amount = Subtotal * (Discount % / 100)
-  const discountAmount = subtotal * (Number(formData.discount_percentage) / 100);
-  const grandTotal = subtotal - discountAmount + Number(formData.tax);
-  const discountPercentage = Number(formData.discount_percentage);
+  const discountPercentage = Number(formData.discount_percentage) || 0;
+  const discountAmount = subtotal * (discountPercentage / 100);
+  const grandTotal = Math.max(0, subtotal - discountAmount + Number(formData.tax || 0));
+  
+  // Rule: Discount > 5% strictly requires Manager approval.
   const isDiscountPending = discountPercentage > 5;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[CONFIRM SALE CLICKED]', {
-      invoiceId: sale?.id,
-      isEditMode: !!sale,
-      status: sale?.status,
-      userId: user?.id
-    });
-    console.log('[CONFIRM SALE HANDLER STARTED]');
     setError('');
     setLoading(true);
 
@@ -211,37 +192,15 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
       }
       if (validItems.length === 0) throw new Error(isRtl ? 'يجب إضافة منتج واحد على الأقل' : 'At least one valid item is required.');
 
-      // Discount > 5% check
-      if (isDiscountPending) {
-        if (!hasPermission('sales.discount.approve')) {
-          throw new Error(isRtl 
-            ? 'عذراً، ليس لديك صلاحية لاعتماد خصم أكبر من 5%' 
-            : 'Permission denied. You do not have permission to approve discounts over 5%');
-        }
-      }
+      // Check approval status requirements
+      const requiresDiscountApproval = discountPercentage > 5;
+      const initialApprovalStatus = requiresDiscountApproval ? 'PENDING' : 'APPROVED';
 
       if (sale) {
-        console.log('[UPDATE FUNCTION CALLED]');
-        console.log('[SUPABASE UPDATE STARTED]', {
-          invoiceId: sale.id,
-          isEditMode: true,
-          status: sale.status,
-          userId: user?.id,
-          changedValues: {
-            customer_id: formData.customer_id,
-            warehouse_id: mainWarehouseId,
-            order_date: formData.order_date,
-            notes: formData.notes,
-            subtotal,
-            discount: discountAmount,
-            tax: Number(formData.tax),
-            grand_total: grandTotal,
-            items: validItems
-          }
-        });
+        // Edit Sale Mode
+        const nextStatus = requiresDiscountApproval ? 'PENDING' : (sale.status === 'CANCELLED' ? 'CANCELLED' : 'CONFIRMED');
+        const nextPaymentStatus = requiresDiscountApproval ? 'UNPAID' : (sale.payment_status || 'PAID');
 
-        // Edit Sale Mode: Update orders table and transition payment_status to PAID
-        const nextStatus = sale.status === 'CANCELLED' ? 'CANCELLED' : 'CONFIRMED';
         const { data: updatedOrder, error: updateOrderError } = await supabase
           .from('orders')
           .update({
@@ -251,10 +210,11 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
             notes: formData.notes,
             subtotal,
             discount: discountAmount,
-            tax: Number(formData.tax),
+            tax: Number(formData.tax || 0),
             grand_total: grandTotal,
             status: nextStatus,
-            payment_status: 'PAID',
+            discount_approval_status: initialApprovalStatus,
+            payment_status: nextPaymentStatus,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -262,16 +222,9 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
           .select();
 
         if (updateOrderError) {
-          console.error('[SUPABASE UPDATE ERROR]', {
-            code: updateOrderError.code,
-            message: updateOrderError.message,
-            details: updateOrderError.details,
-            hint: updateOrderError.hint
-          });
+          console.error('[SUPABASE UPDATE ERROR]', updateOrderError);
           throw updateOrderError;
         }
-
-        console.log('[SUPABASE UPDATE SUCCESS]', updatedOrder);
 
         // Fetch old items for inventory delta calculation
         const { data: oldItems } = await supabase
@@ -285,10 +238,7 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
           .delete()
           .eq('order_id', sale.id);
 
-        if (delItemsError) {
-          console.error('[SUPABASE ORDER_ITEMS DELETE ERROR]', delItemsError);
-          throw delItemsError;
-        }
+        if (delItemsError) throw delItemsError;
 
         const itemsToInsert = validItems.map(item => ({
           order_id: sale.id,
@@ -300,25 +250,63 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
         }));
 
         const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
-        if (itemsError) {
-          console.error('[SUPABASE ORDER_ITEMS INSERT ERROR]', itemsError);
-          throw itemsError;
+        if (itemsError) throw itemsError;
+
+        // If Discount > 5%, record approval request and notify
+        if (requiresDiscountApproval) {
+          const { data: existingAppr } = await supabase
+            .from('discount_approvals')
+            .select('id')
+            .eq('order_id', sale.id)
+            .eq('status', 'PENDING')
+            .limit(1);
+
+          if (existingAppr && existingAppr.length > 0) {
+            await supabase
+              .from('discount_approvals')
+              .update({
+                discount_percentage: discountPercentage,
+                discount_amount: discountAmount,
+                reason: formData.discountReason || formData.notes || (isRtl ? 'تعديل خصم يتجاوز 5%' : 'Updated discount >5% requested'),
+                requested_by: user?.id,
+                requested_at: new Date().toISOString()
+              })
+              .eq('id', existingAppr[0].id);
+          } else {
+            await supabase
+              .from('discount_approvals')
+              .insert({
+                order_id: sale.id,
+                requested_by: user?.id,
+                discount_percentage: discountPercentage,
+                discount_amount: discountAmount,
+                reason: formData.discountReason || formData.notes || (isRtl ? 'طلب اعتماد خصم يتجاوز 5%' : 'Discount approval requested (>5%)'),
+                status: 'PENDING'
+              });
+          }
+
+          notifyDiscountApproval({
+            order_number: sale.order_number || '',
+            discount_percentage: discountPercentage,
+            discount_amount: discountAmount,
+            reason: formData.discountReason || formData.notes || '',
+            requested_by: user?.email || 'User'
+          });
+
+          setPendingApprovalOrder({ ...sale, ...formData, subtotal, discount: discountAmount, grand_total: grandTotal });
+          return;
         }
 
-        // Manage Payment Record (Update existing or insert single record - NO duplicates)
+        // Manage Payment Record when approved
         if (grandTotal > 0) {
-          const { data: existingPayments, error: fetchPayError } = await supabase
+          const { data: existingPayments } = await supabase
             .from('payments')
             .select('id, amount, payment_method, status')
             .eq('order_id', sale.id);
 
-          if (fetchPayError) {
-            console.warn('Payment fetch notice:', fetchPayError);
-          }
-
           if (existingPayments && existingPayments.length > 0) {
             const primaryPayment = existingPayments[0];
-            const { error: updatePayError } = await supabase
+            await supabase
               .from('payments')
               .update({
                 amount: grandTotal,
@@ -326,13 +314,8 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
                 status: 'COMPLETED'
               })
               .eq('id', primaryPayment.id);
-
-            if (updatePayError) {
-              console.error('Error updating existing payment record:', updatePayError);
-              throw updatePayError;
-            }
           } else {
-            const { error: insertPayError } = await supabase
+            await supabase
               .from('payments')
               .insert({
                 order_id: sale.id,
@@ -341,11 +324,6 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
                 status: 'COMPLETED',
                 created_by: user?.id
               });
-
-            if (insertPayError) {
-              console.error('Error creating payment record:', insertPayError);
-              throw insertPayError;
-            }
           }
         }
 
@@ -376,11 +354,11 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
           }
         }
 
-        console.log('[CONFIRM SALE COMPLETED SUCCESSFULLY]');
         onSuccess();
         return;
       }
 
+      // CREATE MODE (New Sale)
       // 1. Insert Order
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -391,11 +369,11 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
           notes: formData.notes,
           subtotal,
           discount: discountAmount,
-          tax: Number(formData.tax),
+          tax: Number(formData.tax || 0),
           grand_total: grandTotal,
           status: 'PENDING',
           payment_status: 'UNPAID',
-          discount_approval_status: isDiscountPending ? 'APPROVED' : 'NONE',
+          discount_approval_status: initialApprovalStatus,
           created_by: user?.id
         })
         .select()
@@ -416,39 +394,106 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
       const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
       if (itemsError) throw itemsError;
 
-      // Since the user is verified to have the permission if discount > 5%, we approve and confirm directly
-      
-      // 3. Confirm Sale (Atomic Deduction)
+      // 3. If Discount > 5%, create approval request and DO NOT auto-confirm
+      if (requiresDiscountApproval) {
+        const { error: approvalErr } = await supabase
+          .from('discount_approvals')
+          .insert({
+            order_id: order.id,
+            requested_by: user?.id,
+            discount_percentage: discountPercentage,
+            discount_amount: discountAmount,
+            reason: formData.discountReason || formData.notes || (isRtl ? 'طلب اعتماد خصم يتجاوز 5%' : 'Discount approval requested (>5%)'),
+            status: 'PENDING'
+          });
+
+        if (approvalErr) {
+          console.error('Error inserting discount approval record:', approvalErr);
+          throw approvalErr;
+        }
+
+        notifyDiscountApproval({
+          order_number: order.order_number || '',
+          discount_percentage: discountPercentage,
+          discount_amount: discountAmount,
+          reason: formData.discountReason || formData.notes || '',
+          requested_by: user?.email || 'User'
+        });
+
+        setPendingApprovalOrder(order);
+        return;
+      }
+
+      // 4. Discount <= 5%: Automatically confirm sale via FEFO deduction
       const { error: confirmError } = await supabase.rpc('confirm_sale', {
         p_order_id: order.id,
         p_user_id: user?.id
       });
       if (confirmError) throw confirmError;
 
-      // 4. Create Payment if Grand Total > 0
+      // 5. Create Payment if Grand Total > 0
       if (grandTotal > 0) {
         const { error: payError } = await supabase.from('payments').insert({
-            order_id: order.id,
-            amount: grandTotal,
-            payment_method: formData.payment_method,
-            status: 'COMPLETED',
-            created_by: user?.id
+          order_id: order.id,
+          amount: grandTotal,
+          payment_method: formData.payment_method || 'CASH',
+          status: 'COMPLETED',
+          created_by: user?.id
         });
         if (payError) throw payError;
         
         await supabase.from('orders').update({ payment_status: 'PAID' }).eq('id', order.id);
       }
 
-      onSuccess();
+      setSuccessOrder(order);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Failed to complete sale');
+      setError(err.message || (isRtl ? 'فشل حفظ الفاتورة' : 'Failed to complete sale'));
     } finally {
       setLoading(false);
     }
   };
 
   if (!isOpen) return null;
+
+  if (pendingApprovalOrder) {
+    return (
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+        <div className="card" style={{ width: '100%', maxWidth: '480px', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '24px', textAlign: 'center' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <ShieldCheck size={32} />
+          </div>
+          <h3 style={{ fontSize: '1.2rem', marginBottom: '8px', color: '#92400e', fontWeight: 700 }}>
+            {isRtl ? 'تم حفظ الفاتورة وإرسال طلب الاعتماد!' : 'Invoice Saved & Approval Requested!'}
+          </h3>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '12px' }}>
+            {isRtl ? `رقم الفاتورة: ${pendingApprovalOrder.order_number || ''}` : `Invoice Number: ${pendingApprovalOrder.order_number || ''}`}
+          </p>
+          <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid #fcd34d', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', fontSize: '0.875rem', color: '#92400e', textAlign: isRtl ? 'right' : 'left' }}>
+            <div><strong>{isRtl ? 'نسبة الخصم المطلوبة:' : 'Requested Discount:'}</strong> {discountPercentage}%</div>
+            <div><strong>{isRtl ? 'حالة الاعتماد:' : 'Approval Status:'}</strong> <span style={{ color: '#b45309', fontWeight: 700 }}>{isRtl ? 'في انتظار الموافقة' : 'Pending Approval'}</span></div>
+            <div style={{ marginTop: '6px', fontSize: '0.8rem', color: '#78350f' }}>
+              {isRtl 
+                ? '⚠️ الخصم يتجاوز 5%، لا يمكن إتمام البيع وصرف المخزون إلا بعد اعتماد الطلب من المدير المصرح له.'
+                : '⚠️ Discount exceeds 5%. The sale cannot be confirmed until an authorized Manager approves the request.'}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button 
+              onClick={() => {
+                setPendingApprovalOrder(null);
+                onSuccess();
+              }}
+              style={{
+                backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem'
+              }}>
+              {isRtl ? 'الانتقال لقائمة الفواتير' : 'Go to Sales List'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (successOrder) {
     return (
@@ -457,12 +502,15 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
           <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#dcfce3', color: '#166534', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
             <CheckCircle size={32} />
           </div>
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>
+          <h3 style={{ fontSize: '1.2rem', marginBottom: '8px', fontWeight: 700 }}>
             {isRtl ? 'تم إتمام عملية البيع بنجاح!' : 'Sale Completed Successfully!'}
           </h3>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '12px' }}>
             {isRtl ? `رقم الفاتورة: ${successOrder.order_number}` : `Invoice Number: ${successOrder.order_number}`}
           </p>
+          <div style={{ display: 'inline-block', padding: '4px 12px', backgroundColor: '#dcfce3', color: '#166534', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 600, marginBottom: '20px' }}>
+            {isRtl ? 'تمت الموافقة تلقائياً (الخصم ≤ 5%)' : 'Auto-Approved (Discount ≤ 5%)'}
+          </div>
           
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
             <button 
@@ -591,6 +639,7 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
                 {/* Items Grid Header */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 2fr) minmax(140px, 1.5fr) 90px 100px 90px 30px', gap: '12px', padding: '0 12px', marginBottom: '6px', color: 'var(--color-text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
                   <div>{t('sales.product')} *</div>
+                  <div>{t('sales.warehouse')} *</div>
                   <div>{t('sales.quantity')} *</div>
                   <div>{t('sales.price')}</div>
                   <div style={{ textAlign: 'right' }}>{t('sales.total')}</div>
@@ -641,12 +690,15 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
                           </select>
                         </div>
                         <div>
-                          <input type="number" required min="0.01"
-                          step="0.01"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                          style={{ width: '100%', padding: '6px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', outline: 'none' }}
-                        />
+                          <input 
+                            type="number" 
+                            required 
+                            min="0.01"
+                            step="0.01"
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                            style={{ width: '100%', padding: '6px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', outline: 'none' }}
+                          />
                       </div>
                       <div>
                         <input
@@ -678,7 +730,7 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
             </div>
 
             <button type="button" onClick={addItem} className="btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: 'var(--color-background)', border: '1px dashed var(--color-primary)', color: 'var(--color-primary)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem', marginBottom: '16px' }}>
-              <Plus size={16} /> Add Row
+              <Plus size={16} /> {isRtl ? 'إضافة سطر منتج' : 'Add Product Row'}
             </button>
 
             {/* Summary Section */}
@@ -697,27 +749,27 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
                   <span style={{ color: 'var(--color-text-muted)' }}>{t('sales.subtotal')}:</span>
                   <span style={{ fontWeight: 500 }}>{subtotal.toLocaleString(undefined, {minimumFractionDigits: 2})} {t('products.currency')}</span>
                 </div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--color-text-muted)' }}>{isRtl ? 'الخصم (%)' : 'Discount (%)'}:</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={formData.discount_percentage}
-                      onChange={(e) => {
-                        let val = Number(e.target.value);
-                        if (val < 0) val = 0;
-                        if (val > 100) val = 100;
-                        setFormData({ ...formData, discount_percentage: val });
-                      }}
-                      style={{ width: '80px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', textAlign: 'right', fontSize: '0.85rem', outline: 'none' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--color-text-muted)' }}>{isRtl ? 'قيمة الخصم' : 'Discount Amount'}:</span>
-                    <span style={{ fontWeight: 500, color: '#ef4444' }}>- {discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2})} {t('products.currency')}</span>
-                  </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{isRtl ? 'الخصم (%)' : 'Discount (%)'}:</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={formData.discount_percentage}
+                    onChange={(e) => {
+                      let val = Number(e.target.value);
+                      if (val < 0) val = 0;
+                      if (val > 100) val = 100;
+                      setFormData({ ...formData, discount_percentage: val });
+                    }}
+                    style={{ width: '80px', padding: '4px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', textAlign: 'right', fontSize: '0.85rem', outline: 'none' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{isRtl ? 'قيمة الخصم' : 'Discount Amount'}:</span>
+                  <span style={{ fontWeight: 600, color: discountAmount > 0 ? '#dc2626' : 'var(--color-text-primary)' }}>- {discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2})} {t('products.currency')}</span>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
                   <span style={{ color: 'var(--color-text-muted)' }}>{t('sales.tax')}:</span>
                   <input
@@ -737,18 +789,19 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
 
               {isDiscountPending && (
                 <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)', padding: '12px 16px', gridColumn: '1 / -1', marginTop: '8px' }}>
-                  <div style={{ display: 'flex', gap: '8px', color: '#b45309', fontWeight: 600, marginBottom: '8px', fontSize: '0.9rem' }}>
-                    <span style={{ fontSize: '1.1rem' }}>⚠️</span> {t('sales.discountExceedsLimit') || 'This discount exceeds the allowed limit of 5% and requires manager approval.'}
+                  <div style={{ display: 'flex', gap: '8px', color: '#b45309', fontWeight: 600, marginBottom: '8px', fontSize: '0.9rem', alignItems: 'center' }}>
+                    <AlertTriangle size={18} color="#d97706" />
+                    <span>{t('sales.discountExceedsLimit') || (isRtl ? 'الخصم يتجاوز 5% ويتطلب موافقة المدير لاعتماده.' : 'This discount exceeds the allowed limit of 5% and requires manager approval.')}</span>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '6px', color: '#92400e' }}>
-                      {t('sales.discountReason') || 'Discount Reason'} *
+                      {t('sales.discountReason') || (isRtl ? 'سبب طلب الخصم' : 'Discount Reason')} *
                     </label>
                     <textarea
                       required
                       value={formData.discountReason}
                       onChange={(e) => setFormData({ ...formData, discountReason: e.target.value })}
-                      placeholder="Please specify why this discount is needed..."
+                      placeholder={isRtl ? 'يرجى توضيح سبب منح هذا الخصم...' : 'Please specify why this discount is needed...'}
                       style={{ width: '100%', padding: '8px 10px', border: '1px solid #fcd34d', borderRadius: 'var(--radius-md)', outline: 'none', fontSize: '0.85rem', backgroundColor: 'var(--color-surface)', minHeight: '60px', resize: 'vertical' }}
                     />
                   </div>
@@ -767,17 +820,17 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
             className="btn"
             style={{ padding: '6px 16px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
           >
-            {t('common.cancel') || 'Cancel'}
+            {t('common.cancel') || (isRtl ? 'إلغاء' : 'Cancel')}
           </button>
           <button
             type="submit"
             form="sale-form"
             disabled={loading}
             className="btn btn-primary"
-            style={{ padding: '6px 16px', border: 'none', borderRadius: 'var(--radius-md)', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 500, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+            style={{ padding: '6px 18px', border: 'none', borderRadius: 'var(--radius-md)', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Save size={16} />
-            {loading ? (t('common.loading') || 'Loading...') : (t('sales.confirmSale') || 'Confirm Sale')}
+            {loading ? (t('common.loading') || 'Loading...') : isDiscountPending ? (isRtl ? 'حفظ وإرسال للاعتماد' : 'Save & Request Approval') : (t('sales.confirmSale') || 'Confirm Sale')}
           </button>
         </div>
       </div>
