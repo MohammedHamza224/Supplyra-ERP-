@@ -1,0 +1,349 @@
+erDiagram
+    %% ==========================================
+    %% SUPPLYRA ENTERPRISE DATABASE ERD (PRODUCTION)
+    %% ==========================================
+
+    %% 1. IDENTITY & RBAC DOMAIN
+    auth_users ||--|| profiles : "1:1 extends"
+    roles ||--o{ profiles : "1:N assigns"
+    roles ||--|{ role_permissions : "1:N grants"
+    permissions ||--|{ role_permissions : "1:N defines"
+
+    %% 2. PRODUCT CATALOG DOMAIN
+    categories ||--o{ categories : "1:N parent/child"
+    categories ||--o{ products : "1:N classifies"
+    brands ||--o{ products : "1:N brands"
+    units ||--o{ products : "1:N measures"
+
+    %% 3. CUSTOMERS & SUPPLIERS DOMAIN
+    customers ||--o{ customer_locations : "1:N delivers_to"
+    customers ||--o{ orders : "1:N places"
+    suppliers ||--o{ product_suppliers : "1:N supplies"
+    products ||--o{ product_suppliers : "1:N sourced_from"
+    suppliers ||--o{ purchases : "1:N issues_to"
+
+    %% 4. INVENTORY & WAREHOUSES DOMAIN
+    warehouses ||--o{ inventory_batches : "1:N stores"
+    products ||--o{ inventory_batches : "1:N batched_into"
+    warehouses ||--o{ purchases : "1:N receives_into"
+    warehouses ||--o{ orders : "1:N fulfills_from"
+    warehouses ||--o{ order_items : "1:N dispatched_from"
+
+    %% 5. PURCHASING DOMAIN
+    purchases ||--|{ purchase_items : "1:N contains"
+    products ||--o{ purchase_items : "1:N ordered_in"
+
+    %% 6. SALES & INVOICING DOMAIN
+    orders ||--|{ order_items : "1:N contains"
+    products ||--o{ order_items : "1:N sold_in"
+    order_items ||--o{ order_item_batches : "1:N deducted_from"
+    inventory_batches ||--o{ order_item_batches : "1:N tracks"
+    orders ||--o{ payments : "1:N paid_by"
+    orders ||--o{ discount_approvals : "1:N requests_approval"
+    auth_users ||--o{ discount_approvals : "1:N requested_by"
+    auth_users ||--o{ discount_approvals : "1:N approved_by"
+
+    %% ------------------------------------------
+    %% ENTITY DEFINITIONS
+    %% ------------------------------------------
+
+    auth_users {
+        UUID id PK
+        TEXT email
+    }
+
+    profiles {
+        UUID id PK,FK "auth.users.id"
+        UUID role_id FK "roles.id"
+        TEXT email
+        TEXT first_name
+        TEXT last_name
+        TEXT avatar_url
+        BOOLEAN active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    roles {
+        UUID id PK
+        TEXT name UK
+        TEXT description
+        BOOLEAN is_system
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    permissions {
+        UUID id PK
+        TEXT code UK
+        TEXT name
+        TEXT module
+        TEXT description
+        TIMESTAMPTZ created_at
+    }
+
+    role_permissions {
+        UUID id PK
+        UUID role_id FK "roles.id"
+        UUID permission_id FK "permissions.id"
+        TIMESTAMPTZ created_at
+    }
+
+    categories {
+        UUID id PK
+        TEXT name UK
+        TEXT description
+        UUID parent_id FK "categories.id"
+        BOOLEAN active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    brands {
+        UUID id PK
+        TEXT name UK
+        TEXT description
+        BOOLEAN active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    units {
+        UUID id PK
+        TEXT name UK
+        TEXT short_name
+        BOOLEAN active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    products {
+        UUID id PK
+        TEXT code UK
+        TEXT name
+        UUID category_id FK "categories.id"
+        UUID brand_id FK "brands.id"
+        UUID unit_id FK "units.id"
+        NUMERIC cost
+        NUMERIC selling_price
+        NUMERIC min_stock
+        TEXT barcode
+        BOOLEAN active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    warehouses {
+        UUID id PK
+        TEXT code UK
+        TEXT name
+        TEXT location
+        BOOLEAN active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    inventory_batches {
+        UUID id PK
+        UUID product_id FK "products.id"
+        UUID warehouse_id FK "warehouses.id"
+        TEXT batch_number
+        DATE production_date
+        DATE expiry_date
+        NUMERIC quantity
+        NUMERIC cost
+        BOOLEAN active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    suppliers {
+        UUID id PK
+        TEXT code UK
+        TEXT name
+        TEXT company_name
+        TEXT phone
+        TEXT mobile
+        TEXT email
+        TEXT tax_number
+        TEXT commercial_register
+        NUMERIC credit_limit
+        INTEGER payment_terms
+        TEXT payment_type
+        TEXT currency
+        TEXT country
+        TEXT city
+        TEXT district
+        TEXT street
+        TEXT building_number
+        TEXT postal_code
+        TEXT address
+        TEXT google_maps_url
+        NUMERIC latitude
+        NUMERIC longitude
+        BOOLEAN active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    product_suppliers {
+        UUID id PK
+        UUID product_id FK "products.id"
+        UUID supplier_id FK "suppliers.id"
+        TEXT supplier_product_code
+        BOOLEAN is_primary
+        NUMERIC min_order_quantity
+        INTEGER lead_time_days
+        NUMERIC purchase_price
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    customers {
+        UUID id PK
+        TEXT code UK
+        TEXT name
+        TEXT customer_type
+        TEXT company_name
+        TEXT phone
+        TEXT mobile
+        TEXT email
+        TEXT tax_number
+        TEXT commercial_register
+        NUMERIC credit_limit
+        INTEGER payment_terms
+        TEXT payment_type
+        TEXT currency
+        BOOLEAN active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    customer_locations {
+        UUID id PK
+        UUID customer_id FK "customers.id"
+        TEXT label
+        TEXT country
+        TEXT city
+        TEXT district
+        TEXT street
+        TEXT building_number
+        TEXT postal_code
+        TEXT address
+        TEXT google_maps_url
+        NUMERIC latitude
+        NUMERIC longitude
+        BOOLEAN is_primary
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    purchases {
+        UUID id PK
+        TEXT purchase_number UK
+        UUID supplier_id FK "suppliers.id"
+        UUID warehouse_id FK "warehouses.id"
+        DATE purchase_date
+        TEXT invoice_number
+        NUMERIC subtotal
+        NUMERIC discount
+        NUMERIC tax
+        NUMERIC grand_total
+        TEXT status
+        TEXT payment_status
+        TEXT notes
+        UUID created_by FK "auth.users.id"
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    purchase_items {
+        UUID id PK
+        UUID purchase_id FK "purchases.id"
+        UUID product_id FK "products.id"
+        NUMERIC quantity
+        NUMERIC purchase_price
+        NUMERIC subtotal
+        TEXT batch_number
+        DATE production_date
+        DATE expiry_date
+        TIMESTAMPTZ created_at
+    }
+
+    orders {
+        UUID id PK
+        TEXT order_number UK
+        UUID customer_id FK "customers.id"
+        UUID warehouse_id FK "warehouses.id"
+        DATE order_date
+        NUMERIC subtotal
+        NUMERIC discount
+        NUMERIC tax
+        NUMERIC grand_total
+        TEXT status
+        TEXT payment_status
+        TEXT discount_approval_status
+        TEXT notes
+        UUID created_by FK "auth.users.id"
+        UUID updated_by FK "auth.users.id"
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    order_items {
+        UUID id PK
+        UUID order_id FK "orders.id"
+        UUID product_id FK "products.id"
+        UUID warehouse_id FK "warehouses.id"
+        NUMERIC quantity
+        NUMERIC unit_price
+        NUMERIC total
+        TIMESTAMPTZ created_at
+    }
+
+    order_item_batches {
+        UUID id PK
+        UUID order_item_id FK "order_items.id"
+        UUID batch_id FK "inventory_batches.id"
+        NUMERIC quantity
+        TIMESTAMPTZ created_at
+    }
+
+    payments {
+        UUID id PK
+        UUID order_id FK "orders.id"
+        NUMERIC amount
+        TEXT payment_method
+        TIMESTAMPTZ payment_date
+        TEXT status
+        TEXT reference_number
+        TEXT notes
+        UUID created_by FK "auth.users.id"
+        TIMESTAMPTZ created_at
+    }
+
+    discount_approvals {
+        UUID id PK
+        UUID order_id FK "orders.id"
+        UUID requested_by FK "auth.users.id"
+        TIMESTAMPTZ requested_at
+        NUMERIC discount_percentage
+        NUMERIC discount_amount
+        TEXT reason
+        TEXT status
+        UUID approved_by FK "auth.users.id"
+        TIMESTAMPTZ approved_at
+        TEXT rejection_reason
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    business_settings {
+        UUID id PK
+        TEXT key UK
+        JSONB value
+        TEXT category
+        TEXT description
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }

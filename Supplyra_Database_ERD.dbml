@@ -1,0 +1,311 @@
+// ==========================================
+// SUPPLYRA ENTERPRISE DATABASE SCHEMA (DBML)
+// ==========================================
+
+Table profiles {
+  id uuid [pk, note: 'Foreign key to auth.users(id)']
+  role_id uuid [ref: > roles.id]
+  email text
+  first_name text
+  last_name text
+  avatar_url text
+  active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table roles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [unique, not null]
+  description text
+  is_system boolean [default: false]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table permissions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [unique, not null]
+  name text [not null]
+  module text [not null]
+  description text
+  created_at timestamptz [default: `now()`]
+}
+
+Table role_permissions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  role_id uuid [not null, ref: > roles.id]
+  permission_id uuid [not null, ref: > permissions.id]
+  created_at timestamptz [default: `now()`]
+
+  indexes {
+    (role_id, permission_id) [unique]
+  }
+}
+
+Table categories {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [unique, not null]
+  description text
+  parent_id uuid [ref: > categories.id]
+  active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table brands {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [unique, not null]
+  description text
+  active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table units {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [unique, not null]
+  short_name text [not null]
+  active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table products {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [unique, not null]
+  name text [not null]
+  category_id uuid [ref: > categories.id]
+  brand_id uuid [ref: > brands.id]
+  unit_id uuid [ref: > units.id]
+  cost numeric(12,2) [default: 0]
+  selling_price numeric(12,2) [default: 0]
+  min_stock numeric(12,2) [default: 0]
+  barcode text
+  active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table warehouses {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [unique, not null]
+  name text [not null]
+  location text
+  active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table inventory_batches {
+  id uuid [pk, default: `gen_random_uuid()`]
+  product_id uuid [not null, ref: > products.id]
+  warehouse_id uuid [not null, ref: > warehouses.id]
+  batch_number text [not null]
+  production_date date
+  expiry_date date
+  quantity numeric(12,2) [default: 0]
+  cost numeric(12,2) [default: 0]
+  active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  indexes {
+    (product_id, warehouse_id, batch_number) [unique]
+  }
+}
+
+Table suppliers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [unique, not null]
+  name text [not null]
+  company_name text
+  phone text
+  mobile text
+  email text
+  tax_number text
+  commercial_register text
+  credit_limit numeric(12,2) [default: 0]
+  payment_terms integer [default: 0]
+  payment_type text [default: 'Cash']
+  currency text [default: 'SAR']
+  country text
+  city text
+  district text
+  street text
+  building_number text
+  postal_code text
+  address text
+  google_maps_url text
+  latitude numeric(10,8)
+  longitude numeric(11,8)
+  active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table product_suppliers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  product_id uuid [not null, ref: > products.id]
+  supplier_id uuid [not null, ref: > suppliers.id]
+  supplier_product_code text
+  is_primary boolean [default: false]
+  min_order_quantity numeric(12,2) [default: 1]
+  lead_time_days integer [default: 0]
+  purchase_price numeric(12,2)
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  indexes {
+    (product_id, supplier_id) [unique]
+  }
+}
+
+Table customers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [unique, not null]
+  name text [not null]
+  customer_type text [default: 'Individual']
+  company_name text
+  phone text
+  mobile text
+  email text
+  tax_number text
+  commercial_register text
+  credit_limit numeric(12,2) [default: 0]
+  payment_terms integer [default: 0]
+  payment_type text [default: 'Cash']
+  currency text [default: 'SAR']
+  active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table customer_locations {
+  id uuid [pk, default: `gen_random_uuid()`]
+  customer_id uuid [not null, ref: > customers.id]
+  label text [not null]
+  country text
+  city text
+  district text
+  street text
+  building_number text
+  postal_code text
+  address text
+  google_maps_url text
+  latitude numeric(10,8)
+  longitude numeric(11,8)
+  is_primary boolean [default: false]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table purchases {
+  id uuid [pk, default: `gen_random_uuid()`]
+  purchase_number text [unique, not null]
+  supplier_id uuid [not null, ref: > suppliers.id]
+  warehouse_id uuid [not null, ref: > warehouses.id]
+  purchase_date date [default: `CURRENT_DATE`]
+  invoice_number text
+  subtotal numeric(12,2) [default: 0]
+  discount numeric(12,2) [default: 0]
+  tax numeric(12,2) [default: 0]
+  grand_total numeric(12,2) [default: 0]
+  status text [default: 'RECEIVED']
+  payment_status text [default: 'UNPAID']
+  notes text
+  created_by uuid
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table purchase_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  purchase_id uuid [not null, ref: > purchases.id]
+  product_id uuid [not null, ref: > products.id]
+  quantity numeric(12,2) [not null]
+  purchase_price numeric(12,2) [not null]
+  subtotal numeric(12,2) [not null]
+  batch_number text
+  production_date date
+  expiry_date date
+  created_at timestamptz [default: `now()`]
+}
+
+Table orders {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_number text [unique, not null]
+  customer_id uuid [ref: > customers.id]
+  warehouse_id uuid [not null, ref: > warehouses.id]
+  order_date date [default: `CURRENT_DATE`]
+  subtotal numeric(12,2) [default: 0]
+  discount numeric(12,2) [default: 0]
+  tax numeric(12,2) [default: 0]
+  grand_total numeric(12,2) [default: 0]
+  status text [default: 'PENDING']
+  payment_status text [default: 'UNPAID']
+  discount_approval_status text [default: 'NONE']
+  notes text
+  created_by uuid
+  updated_by uuid
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table order_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  product_id uuid [not null, ref: > products.id]
+  warehouse_id uuid [not null, ref: > warehouses.id]
+  quantity numeric(12,2) [not null]
+  unit_price numeric(12,2) [not null]
+  total numeric(12,2) [not null]
+  created_at timestamptz [default: `now()`]
+}
+
+Table order_item_batches {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_item_id uuid [not null, ref: > order_items.id]
+  batch_id uuid [not null, ref: > inventory_batches.id]
+  quantity numeric(12,2) [not null]
+  created_at timestamptz [default: `now()`]
+}
+
+Table payments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  amount numeric(12,2) [not null]
+  payment_method text [default: 'CASH']
+  payment_date timestamptz [default: `now()`]
+  status text [default: 'COMPLETED']
+  reference_number text
+  notes text
+  created_by uuid
+  created_at timestamptz [default: `now()`]
+}
+
+Table discount_approvals {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  requested_by uuid
+  requested_at timestamptz [default: `now()`]
+  discount_percentage numeric(5,2) [not null]
+  discount_amount numeric(12,2) [not null]
+  reason text
+  status text [default: 'PENDING']
+  approved_by uuid
+  approved_at timestamptz
+  rejection_reason text
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table business_settings {
+  id uuid [pk, default: `gen_random_uuid()`]
+  key text [unique, not null]
+  value jsonb [not null]
+  category text [default: 'general']
+  description text
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
