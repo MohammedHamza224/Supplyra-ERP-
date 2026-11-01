@@ -157,6 +157,12 @@ a:hover {
   }
 }
 
+@media (min-width: 1024px) and (max-width: 1366px) {
+  .page-container {
+    padding: 18px 20px;
+  }
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;
