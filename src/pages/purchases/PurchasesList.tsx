@@ -197,8 +197,8 @@ const PurchasesList = () => {
                       <td style={{ padding: '12px' }}>{purchase.invoice_number || '-'}</td>
                       <td style={{ padding: '12px' }}>{purchase.supplier?.name || '-'}</td>
                       <td style={{ padding: '12px' }}>{purchase.warehouse?.name || '-'}</td>
-                      <td style={{ padding: '12px' }}>{purchase.purchase_date ? new Date(purchase.purchase_date).toLocaleDateString() : '-'}</td>
-                      <td style={{ padding: '12px', fontWeight: 500 }}>{Number(purchase.grand_total || purchase.subtotal || 0).toLocaleString()} {t('products.currency')}</td>
+                      <td style={{ padding: '12px' }}>{purchase.purchase_date ? new Date(purchase.purchase_date).toLocaleDateString() : (purchase.issue_date ? new Date(purchase.issue_date).toLocaleDateString() : (purchase.created_at ? new Date(purchase.created_at).toLocaleDateString() : '-'))}</td>
+                      <td style={{ padding: '12px', fontWeight: 500 }}>{Number(purchase.total_amount || purchase.grand_total || purchase.subtotal || 0).toLocaleString()} {t('products.currency')}</td>
                       <td style={{ padding: '12px' }}>
                         <span style={{ 
                           display: 'inline-block', padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500,

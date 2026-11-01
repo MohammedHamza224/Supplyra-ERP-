@@ -133,7 +133,11 @@ const Dashboard = () => {
       ]);
 
       // 1. Sales / Orders Query
-      let ordersQuery = supabase.from('orders').select('id, order_number, grand_total, created_at, status, payment_status, customer_id (name)').neq('status', 'CANCELLED');
+      let ordersQuery = supabase
+        .from('orders')
+        .select('id, order_number, total_amount, created_at, status, payment_status, customer:customers(name)')
+        .neq('status', 'cancelled')
+        .neq('status', 'CANCELLED');
       if (fromDateStr) ordersQuery = ordersQuery.gte('created_at', fromDateStr);
       if (toDateStr) ordersQuery = ordersQuery.lte('created_at', toDateStr);
       const { data: orders } = await ordersQuery;
@@ -145,9 +149,10 @@ const Dashboard = () => {
       if (orders) {
         totalOrders = orders.length;
         orders.forEach(o => {
-          totalSales += Number(o.grand_total || 0);
+          const val = Number((o as any).total_amount || (o as any).grand_total || 0);
+          totalSales += val;
           const dateKey = new Date(o.created_at).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' });
-          salesByDate[dateKey] = (salesByDate[dateKey] || 0) + Number(o.grand_total || 0);
+          salesByDate[dateKey] = (salesByDate[dateKey] || 0) + val;
         });
       }
 
@@ -170,6 +175,7 @@ const Dashboard = () => {
       const { data: rawPurchases } = await supabase
         .from('purchases')
         .select('*')
+        .neq('status', 'cancelled')
         .neq('status', 'CANCELLED');
 
       const parseDateSafe = (dInput: any): Date | null => {
@@ -188,7 +194,7 @@ const Dashboard = () => {
       const toTime = toDateStr ? parseDateSafe(toDateStr)?.getTime() || null : null;
 
       const purchases = (rawPurchases || []).filter((p: any) => {
-        const dObj = parseDateSafe(p.purchase_date || p.created_at);
+        const dObj = parseDateSafe(p.purchase_date || p.issue_date || p.created_at);
         if (!dObj) return true;
         const t = dObj.getTime();
         if (fromTime && t < fromTime) return false;
@@ -196,10 +202,10 @@ const Dashboard = () => {
         return true;
       });
 
-      const totalPurchases = purchases.reduce((sum, p) => sum + Number(p.grand_total ?? p.total ?? p.subtotal ?? 0), 0);
+      const totalPurchases = purchases.reduce((sum, p) => sum + Number((p as any).total_amount ?? (p as any).grand_total ?? (p as any).total ?? (p as any).subtotal ?? 0), 0);
 
       // 3. Order Items (COGS, Top Products & Total Quantity Sold)
-      let orderItemsQuery = supabase.from('order_items').select('quantity, total, products (name, purchase_price)');
+      let orderItemsQuery = supabase.from('order_items').select('quantity, subtotal, product:products(name, purchase_price)');
       if (orders && orders.length > 0) {
         orderItemsQuery = orderItemsQuery.in('order_id', orders.map(o => o.id));
       } else {
@@ -213,7 +219,7 @@ const Dashboard = () => {
 
       if (orderItems) {
         orderItems.forEach((item: any) => {
-          const prod: any = Array.isArray(item.products) ? item.products[0] : item.products;
+          const prod: any = Array.isArray(item.product) ? item.product[0] : item.product;
           const cost = Number(prod?.purchase_price || 0);
           const qty = Number(item.quantity || 0);
           const name = prod?.name || 'Unknown';
@@ -233,12 +239,17 @@ const Dashboard = () => {
         .slice(0, 5);
 
       // 4. Expiry & Inventory Alert Counts
-      const { data: batches } = await supabase.from('inventory_batches').select('expiry_date, quantity').eq('active', true).gt('quantity', 0);
+      const { data: batches } = await supabase
+        .from('inventory_batches')
+        .select('expiry_date, quantity')
+        .gt('quantity', 0);
+
       let expiredBatches = 0;
       let expiringSoonBatches = 0;
       if (batches) {
         const todayTime = new Date().setHours(0,0,0,0);
         batches.forEach(b => {
+          if (!b.expiry_date) return;
           const [yyyy, mm, dd] = b.expiry_date.split('-');
           const expTime = new Date(Number(yyyy), Number(mm) - 1, Number(dd)).setHours(0,0,0,0);
           const diffDays = Math.ceil((expTime - todayTime) / (1000 * 60 * 60 * 24));
@@ -253,26 +264,33 @@ const Dashboard = () => {
       if (orders) {
         const customersSet = new Set();
         orders.forEach(o => {
-          if (o.payment_status === 'UNPAID' || o.payment_status === 'PARTIALLY_PAID') {
-            const cust: any = Array.isArray(o.customer_id) ? o.customer_id[0] : o.customer_id;
+          const pStatus = (o.payment_status || '').toUpperCase();
+          if (pStatus === 'UNPAID' || pStatus === 'PARTIALLY_PAID') {
+            const cust: any = Array.isArray(o.customer) ? o.customer[0] : o.customer;
             if (cust?.name) customersSet.add(cust.name);
           }
         });
         customersWithReceivables = customersSet.size;
       }
 
-      const { data: pendingPurchasesData } = await supabase.from('purchases').select('id').in('status', ['PENDING', 'APPROVED']);
+      const { data: pendingPurchasesData } = await supabase
+        .from('purchases')
+        .select('id')
+        .in('status', ['pending', 'PENDING', 'draft', 'DRAFT']);
       const pendingPurchases = pendingPurchasesData ? pendingPurchasesData.length : 0;
 
       // Recent Activity
       const recentActivity: any[] = [];
       if (orders) {
-        orders.slice(0, 3).forEach(o => recentActivity.push({
-          type: language === 'ar' ? 'فاتورة بيع' : 'Sale Invoice',
-          ref: o.order_number,
-          date: new Date(o.created_at),
-          status: o.status === 'COMPLETED' ? 'مكتملة' : o.status === 'PENDING' ? 'قيد الانتظار' : 'ملغاة'
-        }));
+        orders.slice(0, 5).forEach(o => {
+          const st = (o.status || '').toUpperCase();
+          recentActivity.push({
+            type: language === 'ar' ? 'فاتورة بيع' : 'Sale Invoice',
+            ref: o.order_number,
+            date: new Date(o.created_at),
+            status: st === 'CONFIRMED' || st === 'DELIVERED' ? 'مكتملة' : st === 'DRAFT' ? 'مسودة' : 'ملغاة'
+          });
+        });
       }
 
       setStats({

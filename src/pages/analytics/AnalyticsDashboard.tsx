@@ -106,12 +106,12 @@ export default function AnalyticsDashboard() {
         { data: rawCustomers },
         { data: rawSuppliers }
       ] = await Promise.all([
-        supabase.from('orders').select('id, grand_total, status, order_date, created_at, customer_id, customer:customers(name)'),
-        supabase.from('order_items').select('quantity, unit_price, total, product_id, product:products(name, product_code, purchase_price, category:categories(name), brand:brands(name)), order:orders!inner(status, created_at)'),
+        supabase.from('orders').select('id, total_amount, status, created_at, customer_id, customer:customers(name)'),
+        supabase.from('order_items').select('quantity, unit_price, subtotal, product_id, product:products(name, product_code, purchase_price, category:categories(name), brand:brands(name)), order:orders!inner(status, created_at)'),
         supabase.from('purchases').select('*'),
-        supabase.from('purchase_items').select('id, purchase_id, product_id, quantity, purchase_price, total'),
+        supabase.from('purchase_items').select('id, purchase_id, product_id, quantity, unit_cost, subtotal'),
         supabase.from('products').select('id, name, product_code, purchase_price, selling_price, min_stock, active, category:categories(name), brand:brands(name)'),
-        supabase.from('inventory_batches').select('id, product_id, batch_number, quantity, expiry_date, active, product:products(name, min_stock, category:categories(name))'),
+        supabase.from('inventory_batches').select('id, product_id, batch_number, quantity, expiry_date, product:products(name, min_stock, category:categories(name))'),
         supabase.from('customers').select('id, name, active'),
         supabase.from('suppliers').select('id, name, active')
       ]);
@@ -133,7 +133,7 @@ export default function AnalyticsDashboard() {
 
       // Filter Sales Orders based on selected Date Range
       const validOrders = (rawOrders || []).filter((o: any) => {
-        if (o.status === 'CANCELLED') return false;
+        if ((o.status || '').toUpperCase() === 'CANCELLED') return false;
         const dObj = parseDateSafe(o.order_date || o.created_at);
         if (!dObj) return true;
         const t = dObj.getTime();
@@ -155,7 +155,7 @@ export default function AnalyticsDashboard() {
 
       // Filter Order Items based on Date Range
       const validOrderItems = (rawOrderItems || []).filter((item: any) => {
-        const orderStatus = item.order?.status;
+        const orderStatus = (item.order?.status || '').toUpperCase();
         if (orderStatus === 'CANCELLED') return false;
         const dStr = item.order?.created_at;
         if (!dStr) return true;
@@ -166,8 +166,8 @@ export default function AnalyticsDashboard() {
       });
 
       // 1. Calculate Sales & Purchase Financial Metrics
-      const totalSalesRevenue = validOrders.reduce((sum: number, o: any) => sum + Number(o.grand_total || 0), 0);
-      const totalPurchasesAmount = validPurchases.reduce((sum: number, p: any) => sum + Number(p.grand_total ?? p.total ?? p.subtotal ?? 0), 0);
+      const totalSalesRevenue = validOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || o.grand_total || 0), 0);
+      const totalPurchasesAmount = validPurchases.reduce((sum: number, p: any) => sum + Number(p.total_amount ?? p.grand_total ?? p.total ?? p.subtotal ?? 0), 0);
 
       // COGS (Cost of Goods Sold) calculation based on sold items
       let totalCogs = 0;

@@ -43,7 +43,7 @@ const SalesList = () => {
         .from('orders')
         .select(`
           *,
-          customer:customers(name, mobile),
+          customer:customers(name, phone),
           warehouse:warehouses(id, name),
           order_items(warehouse_id, warehouse:warehouses(name))
         `)
@@ -91,6 +91,12 @@ const SalesList = () => {
         }
         return {
           ...sale,
+          grand_total: Number(sale.grand_total || sale.total_amount || 0),
+          order_date: sale.order_date || sale.created_at,
+          customer: sale.customer ? {
+            ...sale.customer,
+            mobile: sale.customer.phone || sale.customer.mobile
+          } : null,
           warehouse_name_display: whName || '-'
         };
       });
