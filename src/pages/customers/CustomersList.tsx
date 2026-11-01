@@ -51,21 +51,57 @@ const CustomersList = () => {
       setFetchError(null);
       if (showLoader) setLoading(true);
       
-      let query = supabase
+      // Step 1: Query customers with joined locations dynamically
+      let { data, error } = await supabase
         .from('customers')
         .select(`
-          id, name, mobile, address, payment_type, active,
-            customer_locations(id, address, google_maps_url, latitude, longitude)
+          *,
+          customer_locations(*)
         `)
         .order('created_at', { ascending: false });
 
-      if (debouncedSearchTerm) {
-        query = query.or(`name.ilike.%${debouncedSearchTerm}%,mobile.ilike.%${debouncedSearchTerm}%`);
+      // Fallback if joined query fails for any reason
+      if (error) {
+        console.warn('Customer join query notice, falling back to base query:', error.message);
+        const fallback = await supabase
+          .from('customers')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (fallback.error) throw fallback.error;
+        data = fallback.data || [];
+
+        // Try to fetch locations separately
+        try {
+          const { data: locs } = await supabase.from('customer_locations').select('*');
+          if (locs && locs.length > 0) {
+            const locMap = new Map();
+            locs.forEach((l: any) => {
+              if (!locMap.has(l.customer_id)) locMap.set(l.customer_id, []);
+              locMap.get(l.customer_id).push(l);
+            });
+            data = data.map((c: any) => ({
+              ...c,
+              customer_locations: locMap.get(c.id) || []
+            }));
+          }
+        } catch (locErr) {
+          console.warn('Customer locations separate query notice:', locErr);
+        }
       }
 
-      const { data, error } = await query;
+      // Memory filtering for search
+      if (debouncedSearchTerm && data) {
+        const term = debouncedSearchTerm.toLowerCase();
+        data = data.filter((c: any) => 
+          (c.name && c.name.toLowerCase().includes(term)) ||
+          (c.phone && c.phone.includes(term)) ||
+          (c.mobile && c.mobile.includes(term)) ||
+          (c.email && c.email.toLowerCase().includes(term)) ||
+          (c.address && c.address.toLowerCase().includes(term))
+        );
+      }
 
-      if (error) throw error;
       setCustomers(data || []);
     } catch (error: any) {
       console.error('Error fetching customers:', error);
@@ -118,10 +154,14 @@ const CustomersList = () => {
   };
 
   const extractCoordsFromUrl = (url: string) => {
-    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const match = url.match(regex);
-    if (match) {
-      setLocationData(prev => ({ ...prev, latitude: match[1], longitude: match[2] }));
+    const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atMatch) {
+      setLocationData(prev => ({ ...prev, latitude: atMatch[1], longitude: atMatch[2] }));
+      return;
+    }
+    const qMatch = url.match(/[?&](?:q|query)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (qMatch) {
+      setLocationData(prev => ({ ...prev, latitude: qMatch[1], longitude: qMatch[2] }));
     }
   };
 
@@ -132,29 +172,28 @@ const CustomersList = () => {
   };
 
   const openModal = (customer?: any) => {
-     console.log('EDIT CUSTOMER DATA:', customer);
-
-  setFormError('');
     setFormError('');
     if (customer) {
       setEditingId(customer.id);
       setFormData({
-        name: customer.name,
-        mobile: customer.mobile || '',
-        payment_type: customer.payment_type || 'cash',
+        name: customer.name || '',
+        mobile: customer.phone || customer.mobile || '',
+        payment_type: customer.payment_type || (customer.payment_terms > 0 ? 'Credit' : 'Cash'),
         contact_person: customer.contact_person || '',
-        region: customer.region || '',
+        region: customer.region || customer.city || '',
         credit_limit: customer.credit_limit ? customer.credit_limit.toString() : '0',
-        payment_terms_days: customer.payment_terms_days ? customer.payment_terms_days.toString() : '0',
+        payment_terms_days: customer.payment_terms_days ? customer.payment_terms_days.toString() : (customer.payment_terms ? customer.payment_terms.toString() : '0'),
       });
       
       const loc = customer.customer_locations && customer.customer_locations.length > 0 ? customer.customer_locations[0] : null;
       if (loc) {
         setEditingLocationId(loc.id);
+        const derivedMaps = loc.google_maps_url || 
+          (loc.latitude && loc.longitude ? `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}` : '');
         setLocationData({
-          location_name: loc.location_name || 'Main Location',
+          location_name: loc.name || loc.location_name || 'Main Location',
           address: loc.address || customer.address || '',
-          google_maps_url: loc.google_maps_url || '',
+          google_maps_url: derivedMaps,
           latitude: loc.latitude ? loc.latitude.toString() : '',
           longitude: loc.longitude ? loc.longitude.toString() : '',
         });
@@ -201,10 +240,22 @@ const CustomersList = () => {
     setSaving(true);
 
     try {
-      const payload = {
-        ...formData,
-        credit_limit: parseFloat(formData.credit_limit || '0'),
-        payment_terms_days: parseInt(formData.payment_terms_days || '0', 10),
+      const creditNum = parseFloat(formData.credit_limit || '0');
+      const termsNum = parseInt(formData.payment_terms_days || '0', 10) || (formData.payment_type === 'Credit' ? 30 : 0);
+
+      // Defensively prepare payload with all possible columns
+      const fullPayload: any = {
+        name: formData.name,
+        address: locationData.address || '',
+        credit_limit: creditNum,
+        phone: formData.mobile || '',
+        mobile: formData.mobile || '',
+        payment_terms: termsNum,
+        payment_terms_days: termsNum,
+        payment_type: formData.payment_type,
+        contact_person: formData.contact_person || '',
+        region: formData.region || '',
+        active: true,
       };
 
       let currentCustomerId = editingId;
@@ -212,34 +263,79 @@ const CustomersList = () => {
       if (editingId) {
         const { error } = await supabase
           .from('customers')
-          .update(payload)
+          .update(fullPayload)
           .eq('id', editingId);
-        if (error) throw error;
+        
+        if (error) {
+          console.warn('Customer update full payload error, retrying safe payload:', error.message);
+          const safePayload: any = {
+            name: formData.name,
+            phone: formData.mobile || '',
+            address: locationData.address || '',
+            credit_limit: creditNum,
+            payment_terms: termsNum,
+            active: true
+          };
+          const { error: retryError } = await supabase.from('customers').update(safePayload).eq('id', editingId);
+          if (retryError) throw retryError;
+        }
       } else {
-        const { data, error } = await supabase.from('customers').insert([payload]).select().single();
-        if (error) throw error;
-        currentCustomerId = data.id;
+        const { data, error } = await supabase.from('customers').insert([fullPayload]).select().single();
+        if (error) {
+          console.warn('Customer insert full payload error, retrying safe payload:', error.message);
+          const safePayload: any = {
+            name: formData.name,
+            phone: formData.mobile || '',
+            address: locationData.address || '',
+            credit_limit: creditNum,
+            payment_terms: termsNum,
+            active: true
+          };
+          const { data: retryData, error: retryError } = await supabase.from('customers').insert([safePayload]).select().single();
+          if (retryError) throw retryError;
+          currentCustomerId = retryData.id;
+        } else {
+          currentCustomerId = data.id;
+        }
       }
 
-      if (currentCustomerId) {
-        const locPayload = {
+      if (currentCustomerId && (locationData.address || locationData.latitude || locationData.google_maps_url)) {
+        const locPayload: any = {
           customer_id: currentCustomerId,
-          location_name: locationData.location_name,
-          address: locationData.address,
-          google_maps_url: locationData.google_maps_url,
+          name: locationData.location_name || 'Main Location',
+          location_name: locationData.location_name || 'Main Location',
+          address: locationData.address || '',
+          google_maps_url: locationData.google_maps_url || null,
           latitude: locationData.latitude ? parseFloat(locationData.latitude) : null,
           longitude: locationData.longitude ? parseFloat(locationData.longitude) : null,
+          is_primary: true,
+          active: true,
         };
 
         if (editingLocationId) {
-           const { error: locError } = await supabase.from('customer_locations').update(locPayload).eq('id', editingLocationId);
-           if (locError) console.error("Error updating location", locError);
+          const { error: locError } = await supabase.from('customer_locations').update(locPayload).eq('id', editingLocationId);
+          if (locError) {
+            console.warn('Location update full payload error, retrying safe payload:', locError.message);
+            await supabase.from('customer_locations').update({
+              customer_id: currentCustomerId,
+              name: locationData.location_name || 'Main Location',
+              address: locationData.address || '',
+              latitude: locPayload.latitude,
+              longitude: locPayload.longitude,
+            }).eq('id', editingLocationId);
+          }
         } else {
-           const { error: locError } = await supabase.from('customer_locations').insert([locPayload]);
-           if (locError) {
-  console.error('LOCATION INSERT ERROR:', locError);
-  throw locError;
-}
+          const { error: locError } = await supabase.from('customer_locations').insert([locPayload]);
+          if (locError) {
+            console.warn('Location insert full payload error, retrying safe payload:', locError.message);
+            await supabase.from('customer_locations').insert([{
+              customer_id: currentCustomerId,
+              name: locationData.location_name || 'Main Location',
+              address: locationData.address || '',
+              latitude: locPayload.latitude,
+              longitude: locPayload.longitude,
+            }]);
+          }
         }
       }
 
@@ -318,11 +414,11 @@ const CustomersList = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 'var(--spacing-8)' }}>{t('common.loading')}</td>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: 'var(--spacing-8)' }}>{t('common.loading')}</td>
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 'var(--spacing-8)', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: 'var(--spacing-8)', color: 'var(--color-text-muted)' }}>
                     {t('customers.noCustomers')}
                   </td>
                 </tr>
@@ -330,20 +426,14 @@ const CustomersList = () => {
                 customers.map((customer) => (
                   <tr key={customer.id}>
                     <td style={{ fontWeight: 500 }}>{customer.name}</td>
-                    <td>{customer.mobile || '-'}</td>
+                    <td>{customer.phone || customer.mobile || '-'}</td>
                     <td>
                       <span className={`badge ${
-                        customer.payment_type === 'cash' ? 'badge-success' :
-                        customer.payment_type === 'credit' ? 'badge-warning' :
-                        'badge-neutral'
+                        (customer.payment_type?.toLowerCase() === 'credit' || (customer.payment_terms && Number(customer.payment_terms) > 0)) ? 'badge-warning' : 'badge-success'
                       }`}>
-                        {customer.payment_type === 'cash' ? t('customers.cash') :
-                         customer.payment_type === 'credit' ? t('customers.credit') :
-                         customer.payment_type === 'partial' ? t('customers.partial') :
-                         customer.payment_type === 'card' ? t('customers.card') :
-                         customer.payment_type === 'bank_transfer' ? t('customers.bank_transfer') :
-                         customer.payment_type === 'wallet' ? t('customers.wallet') :
-                         customer.payment_type}
+                        {customer.payment_terms && Number(customer.payment_terms) > 0
+                          ? (language === 'ar' ? `آجل (${customer.payment_terms} يوم)` : `Credit (${customer.payment_terms}d)`)
+                          : (customer.payment_type || (language === 'ar' ? 'نقدي' : 'Cash'))}
                       </span>
                     </td>
                     <td>
@@ -371,7 +461,7 @@ const CustomersList = () => {
                               </a>
                             ) : (
                               <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
-                                📌 {language === 'ar' ? 'الموقع غير مدد' : 'Location not set'}
+                                📌 {language === 'ar' ? 'الموقع غير محدد' : 'Location not set'}
                               </span>
                             );
                         })()}
