@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AppShell from './components/layout/AppShell';
@@ -6,19 +6,43 @@ import Login from './pages/Login';
 import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
-import ProductsList from './pages/products/ProductsList';
-import SuppliersList from './pages/suppliers/SuppliersList';
-import CustomersList from './pages/customers/CustomersList';
-import WarehousesList from './pages/warehouses/WarehousesList';
-import UsersList from './pages/users/UsersList';
-import InventoryList from './pages/inventory/InventoryList';
-import PurchasesList from './pages/purchases/PurchasesList';
-import SalesList from './pages/sales/SalesList';
+// Lazy Loaded Route Chunks for Maximum Initial Load Speed & Performance
+const ProductsList = lazy(() => import('./pages/products/ProductsList'));
+const SuppliersList = lazy(() => import('./pages/suppliers/SuppliersList'));
+const CustomersList = lazy(() => import('./pages/customers/CustomersList'));
+const WarehousesList = lazy(() => import('./pages/warehouses/WarehousesList'));
+const UsersList = lazy(() => import('./pages/users/UsersList'));
+const InventoryList = lazy(() => import('./pages/inventory/InventoryList'));
+const PurchasesList = lazy(() => import('./pages/purchases/PurchasesList'));
+const SalesList = lazy(() => import('./pages/sales/SalesList'));
+const Dashboard = lazy(() => import('./pages/dashboard/Dashboard'));
+const AnalyticsDashboard = lazy(() => import('./pages/analytics/AnalyticsDashboard'));
+const AIAssistant = lazy(() => import('./pages/ai-assistant/AIAssistant'));
+const Settings = lazy(() => import('./pages/settings/Settings'));
 
-import Dashboard from './pages/dashboard/Dashboard';
-import AnalyticsDashboard from './pages/analytics/AnalyticsDashboard';
-import AIAssistant from './pages/ai-assistant/AIAssistant';
-import Settings from './pages/settings/Settings';
+const PageLoader = () => (
+  <div style={{
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '60vh',
+    gap: '14px',
+    color: 'var(--color-text-secondary)'
+  }}>
+    <div style={{
+      width: '36px',
+      height: '36px',
+      border: '3px solid var(--color-border)',
+      borderTopColor: 'var(--color-primary)',
+      borderRadius: '50%',
+      animation: 'spin 0.8s linear infinite'
+    }} />
+    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>
+      {document.documentElement.dir === 'rtl' ? 'جاري التحميل...' : 'Loading...'}
+    </span>
+  </div>
+);
 
 const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -42,7 +66,7 @@ function App() {
           <Route path="/login" element={<LoginRoute />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           
-          <Route path="/" element={<AuthGuard><AppShell><Outlet /></AppShell></AuthGuard>}>
+          <Route path="/" element={<AuthGuard><AppShell><Suspense fallback={<PageLoader />}><Outlet /></Suspense></AppShell></AuthGuard>}>
             <Route index element={<Dashboard />} />
             
             <Route element={<ProtectedRoute requiredPermission="products.view" />}>
