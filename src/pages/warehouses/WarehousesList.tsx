@@ -11,6 +11,7 @@ const WarehousesList = () => {
   const { hasPermission } = useAuth();
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -37,62 +38,47 @@ const WarehousesList = () => {
   const fetchWarehouses = async () => {
     try {
       setLoading(true);
+      setFetchError('');
       
-      let query = supabase
+      // Step 1: Safe dynamic select
+      let { data, error } = await supabase
         .from('warehouses')
-        .select('id, code, name, location, notes, active')
-        .neq('active', false)
-        .order('code');
+        .select('*')
+        .order('name');
 
-      if (debouncedSearchTerm) {
-        query = query.or(`name.ilike.%${debouncedSearchTerm}%,code.ilike.%${debouncedSearchTerm}%`);
+      if (error) {
+        console.warn('Full warehouses select notice, falling back to base columns:', error.message);
+        const fallback = await supabase
+          .from('warehouses')
+          .select('id, code, name, location')
+          .order('name');
+        if (fallback.error) throw fallback.error;
+        data = fallback.data;
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
       
       if (!data) {
          setWarehouses([]);
          return;
       }
 
-      // Safe duplicate merging logic
-      const nameCounts = data.reduce((acc: any, w: any) => {
-         acc[w.name] = (acc[w.name] || 0) + 1;
-         return acc;
-      }, {});
-
-      const processedData = [...data];
-
-      for (const [name, count] of Object.entries(nameCounts)) {
-        if ((count as number) > 1) {
-           const duplicates = processedData.filter(w => w.name === name);
-           
-           const withDeps = await Promise.all(duplicates.map(async (w) => {
-              const [inv, ord, pur] = await Promise.all([
-                 supabase.from('inventory_batches').select('id', { count: 'exact', head: true }).eq('warehouse_id', w.id),
-                 supabase.from('orders').select('id', { count: 'exact', head: true }).eq('warehouse_id', w.id),
-                 supabase.from('purchases').select('id', { count: 'exact', head: true }).eq('warehouse_id', w.id)
-              ]);
-              return {
-                 ...w,
-                 depCount: (inv.count || 0) + (ord.count || 0) + (pur.count || 0)
-              };
-           }));
-           
-           withDeps.sort((a, b) => b.depCount - a.depCount);
-           
-           for (let i = 1; i < withDeps.length; i++) {
-              const idx = processedData.findIndex(w => w.id === withDeps[i].id);
-              if (idx !== -1) processedData.splice(idx, 1);
-           }
-        }
+      // Memory filter for search term
+      let processedData = [...data];
+      if (debouncedSearchTerm) {
+        const term = debouncedSearchTerm.toLowerCase();
+        processedData = processedData.filter((w: any) =>
+          (w.name && w.name.toLowerCase().includes(term)) ||
+          (w.code && w.code.toLowerCase().includes(term)) ||
+          (w.location && w.location.toLowerCase().includes(term))
+        );
       }
+
+      // Filter out explicitly deactivated warehouses if active column is present
+      processedData = processedData.filter((w: any) => w.active !== false);
 
       setWarehouses(processedData);
     } catch (error: any) {
       console.error('Error fetching warehouses:', error);
+      setFetchError(error?.message || 'Failed to load warehouses');
     } finally {
       setLoading(false);
     }
@@ -130,15 +116,46 @@ const WarehousesList = () => {
     setSaving(true);
 
     try {
+      const fullPayload: any = {
+        code: formData.code.trim().toUpperCase(),
+        name: formData.name.trim(),
+        location: formData.location ? formData.location.trim() : '',
+        active: true,
+      };
+      if (formData.notes) {
+        fullPayload.notes = formData.notes.trim();
+      }
+
       if (editingId) {
         const { error } = await supabase
           .from('warehouses')
-          .update(formData)
+          .update(fullPayload)
           .eq('id', editingId);
-        if (error) throw error;
+
+        if (error) {
+          console.warn('Warehouse update with notes failed, retrying base payload:', error.message);
+          const safePayload = {
+            code: formData.code.trim().toUpperCase(),
+            name: formData.name.trim(),
+            location: formData.location ? formData.location.trim() : '',
+            active: true
+          };
+          const { error: retryError } = await supabase.from('warehouses').update(safePayload).eq('id', editingId);
+          if (retryError) throw retryError;
+        }
       } else {
-        const { error } = await supabase.from('warehouses').insert([formData]);
-        if (error) throw error;
+        const { error } = await supabase.from('warehouses').insert([fullPayload]);
+        if (error) {
+          console.warn('Warehouse insert with notes failed, retrying base payload:', error.message);
+          const safePayload = {
+            code: formData.code.trim().toUpperCase(),
+            name: formData.name.trim(),
+            location: formData.location ? formData.location.trim() : '',
+            active: true
+          };
+          const { error: retryError } = await supabase.from('warehouses').insert([safePayload]);
+          if (retryError) throw retryError;
+        }
       }
 
       await fetchWarehouses();
@@ -230,6 +247,12 @@ const WarehousesList = () => {
             />
           </div>
         </div>
+
+        {fetchError && (
+          <div style={{ padding: '16px', margin: '16px', backgroundColor: 'var(--color-danger-light)', color: 'var(--color-danger)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-danger)' }}>
+            <strong>Database Error:</strong> {fetchError}
+          </div>
+        )}
 
         <div className="table-responsive">
           <table className="table">

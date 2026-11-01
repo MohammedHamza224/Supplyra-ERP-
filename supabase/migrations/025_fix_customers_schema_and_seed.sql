@@ -131,3 +131,17 @@ BEGIN
     END IF;
 END;
 $$;
+
+-- 4. Ensure all compatibility columns exist in warehouses
+ALTER TABLE public.warehouses ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.warehouses ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE public.warehouses ADD COLUMN IF NOT EXISTS phone TEXT;
+
+-- 5. Seed 2 Realistic Demo Warehouses (Riyadh & Jeddah)
+INSERT INTO public.warehouses (code, name, location, active, notes)
+VALUES 
+  ('MAIN', 'المستودع الرئيسي - الرياض', 'الرياض - المنطقة الصناعية الثانية - طريق الخرج', true, 'المستودع المركزي لتوزيع المواد الغذائية الجافة والمبردة'),
+  ('JED-01', 'مستودع فرع الغربية - جدة', 'جدة - الخمرة - مستودعات التوزيع', true, 'مستودع توزيع المنطقة الغربية')
+ON CONFLICT (code) DO UPDATE 
+SET name = EXCLUDED.name, location = EXCLUDED.location, active = true;
+
