@@ -8,6 +8,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 
 const WarehousesList = () => {
   const { t, language } = useTranslation();
+  const isRtl = language === 'ar';
   const { hasPermission } = useAuth();
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -255,60 +256,147 @@ const WarehousesList = () => {
         )}
 
         <div className="table-responsive">
-          <table className="table">
+          <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
-              <tr>
-                <th>{t('warehouses.code')}</th>
-                <th>{t('warehouses.name')}</th>
-                <th>{t('warehouses.location')}</th>
-                <th>{t('common.status')}</th>
-                <th style={{ textAlign: 'right' }}>{t('common.actions')}</th>
+              <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('warehouses.code')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('warehouses.name')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('warehouses.location')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('common.status')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: 'var(--spacing-8)' }}>{t('common.loading')}</td>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '28px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>{t('common.loading')}</td>
                 </tr>
               ) : warehouses.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: 'var(--spacing-8)', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '28px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
                     {t('common.noData')}
                   </td>
                 </tr>
               ) : (
                 warehouses.map((warehouse) => (
-                  <tr key={warehouse.id}>
-                    <td style={{ fontWeight: 600, color: 'var(--color-primary-dark)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Building2 size={16} color="var(--color-text-muted)" />
+                  <tr key={warehouse.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      <span style={{ 
+                        fontSize: '0.75rem', 
+                        fontFamily: 'monospace', 
+                        backgroundColor: 'var(--color-background)', 
+                        border: '1px solid var(--color-border)',
+                        padding: '3px 8px', 
+                        borderRadius: '4px',
+                        color: 'var(--color-text-primary)'
+                      }}>
                         {warehouse.code}
-                      </div>
+                      </span>
                     </td>
-                    <td style={{ fontWeight: 500 }}>{warehouse.name}</td>
-                    <td>{warehouse.location || '-'}</td>
-                    <td>
-                      <span className={`badge ${warehouse.active ? 'badge-success' : 'badge-neutral'}`}>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                      {warehouse.name}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                      {warehouse.location ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          📍 {warehouse.location}
+                        </span>
+                      ) : '-'}
+                    </td>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '3px 9px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          backgroundColor: warehouse.active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                          color: warehouse.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)',
+                        }}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: warehouse.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)' }} />
                         {warehouse.active ? t('common.active') : t('common.inactive')}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td style={{ padding: '8px 14px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        flexWrap: 'nowrap',
+                        verticalAlign: 'middle'
+                      }}>
                         {hasPermission('warehouses.update') && (
-                          <button type="button" className="btn btn-secondary" style={{ padding: '6px', marginRight: '4px' }} onClick={() => openModal(warehouse)} title={t('common.edit')}>
-                            <Edit2 size={16} />
+                          <button 
+                            type="button" 
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              backgroundColor: 'var(--color-surface)',
+                              color: 'var(--color-text-secondary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onClick={() => navigate('/inventory?warehouse_id=' + warehouse.id)} 
+                            title={t('warehouses.manage') || 'Manage Warehouse'}
+                          >
+                            <Building size={15} />
                           </button>
                         )}
                         {hasPermission('warehouses.update') && (
-                          <button type="button" className="btn btn-secondary" style={{ padding: '6px', marginRight: '4px' }} onClick={() => navigate('/inventory?warehouse_id=' + warehouse.id)} title={t('warehouses.manage') || 'Manage Warehouse'}>
-                            <Building size={16} />
+                          <button 
+                            type="button" 
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              backgroundColor: 'var(--color-surface)',
+                              color: 'var(--color-primary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onClick={() => openModal(warehouse)} 
+                            title={t('common.edit')}
+                          >
+                            <Edit2 size={15} />
                           </button>
                         )}
                         {(hasPermission('warehouses.delete') || hasPermission('warehouses.update') || hasPermission('warehouses.create')) && (
-                          <button type="button" className="btn btn-danger" style={{ padding: '6px' }} onClick={() => confirmDeleteClick(warehouse)} title={t('common.delete')}>
-                            <Trash2 size={16} />
+                          <button 
+                            type="button" 
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                              color: 'rgb(239, 68, 68)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onClick={() => confirmDeleteClick(warehouse)} 
+                            title={t('common.delete')}
+                          >
+                            <Trash2 size={15} />
                           </button>
                         )}
-                      </td>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}

@@ -13,6 +13,7 @@ interface PurchaseDetailsProps {
 
 const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, onRefresh }) => {
   const { t, language } = useTranslation();
+  const isRtl = language === 'ar';
   const { user, hasPermission } = useAuth();
   
   const [purchase, setPurchase] = useState<any>(null);
@@ -163,39 +164,55 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
           </div>
 
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '16px' }}>{t('purchases.items')}</h3>
-          <div className="table-responsive">
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '16px' }}>
+          <div className="table-responsive" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
+            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
-              <tr style={{ backgroundColor: 'var(--color-background)', borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ padding: '12px', fontSize: '0.85rem' }}>{t('purchases.product')}</th>
-                <th style={{ padding: '12px', fontSize: '0.85rem' }}>{language === 'ar' ? 'الفئة' : 'Category'}</th>
-                <th style={{ padding: '12px', fontSize: '0.85rem' }}>{language === 'ar' ? 'الفئة الفرعية' : 'Subcategory'}</th>
-                <th style={{ padding: '12px', fontSize: '0.85rem' }}>{t('purchases.batch')} / {t('purchases.expiryDate')}</th>
-                <th style={{ padding: '12px', fontSize: '0.85rem' }}>{t('purchases.quantity')}</th>
-                <th style={{ padding: '12px', fontSize: '0.85rem' }}>{t('purchases.unitPrice')}</th>
-                <th style={{ padding: '12px', fontSize: '0.85rem', textAlign: 'right' }}>{t('purchases.total')}</th>
+              <tr style={{ backgroundColor: 'var(--color-background)', borderBottom: '2px solid var(--color-border)', textAlign: isRtl ? 'right' : 'left' }}>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('purchases.product')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{language === 'ar' ? 'الفئة' : 'Category'}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{language === 'ar' ? 'العلامة التجارية' : 'Brand'}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('purchases.batch')} / {t('purchases.expiryDate')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', textAlign: 'center' }}>{t('purchases.quantity')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', textAlign: isRtl ? 'left' : 'right' }}>{t('purchases.unitPrice')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', textAlign: isRtl ? 'left' : 'right' }}>{t('purchases.total')}</th>
               </tr>
             </thead>
             <tbody>
               {items.map(item => (
-                <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '12px' }}>
-                    <div style={{ fontWeight: 500 }}>{item.product?.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{item.product?.product_code}</div>
+                <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                  <td style={{ padding: '10px 14px' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{item.product?.name}</div>
+                    {item.product?.product_code && (
+                      <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '1px 6px', borderRadius: '4px', marginTop: '2px', display: 'inline-block' }}>
+                        {item.product.product_code}
+                      </span>
+                    )}
                   </td>
-                  <td style={{ padding: '12px', fontSize: '0.85rem' }}>
-                    {item.product?.category?.name || (language === 'ar' ? 'غير محدد' : 'Not Set')}
+                  <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                    {item.product?.category?.name || '-'}
                   </td>
-                  <td style={{ padding: '12px', fontSize: '0.85rem' }}>
-                    {item.product?.brand?.name || (language === 'ar' ? 'غير محدد' : 'Not Set')}
+                  <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                    {item.product?.brand?.name || '-'}
                   </td>
-                  <td style={{ padding: '12px', fontSize: '0.85rem' }}>
-                    <div>{item.batch_number || '-'}</div>
-                    <div style={{ color: 'var(--color-text-muted)' }}>Exp: {item.expiry_date || '-'}</div>
+                  <td style={{ padding: '10px 14px', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>
+                    {item.batch_number ? (
+                      <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '2px 6px', borderRadius: '4px' }}>
+                        {item.batch_number}
+                      </span>
+                    ) : '-'}
+                    {item.expiry_date && (
+                      <div style={{ color: 'var(--color-text-muted)', fontSize: '0.72rem', marginTop: '2px' }}>Exp: {item.expiry_date}</div>
+                    )}
                   </td>
-                  <td style={{ padding: '12px' }}>{item.quantity} {item.unit?.code}</td>
-                  <td style={{ padding: '12px' }}>{Number(item.purchase_price).toLocaleString()}</td>
-                  <td style={{ padding: '12px', textAlign: 'right', fontWeight: 500 }}>{Number(item.total).toLocaleString()}</td>
+                  <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, fontSize: '0.875rem' }}>
+                    {item.quantity} {item.unit?.code || ''}
+                  </td>
+                  <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontSize: '0.85rem' }}>
+                    {Number(item.purchase_price).toFixed(2)}
+                  </td>
+                  <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.875rem' }}>
+                    {Number(item.total).toFixed(2)} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--color-text-secondary)' }}>{t('products.currency')}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>

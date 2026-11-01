@@ -8,6 +8,7 @@ import SupplierProducts from './SupplierProducts';
 
 const SuppliersList = () => {
   const { t, language } = useTranslation();
+  const isRtl = language === 'ar';
   const { hasPermission } = useAuth();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -296,73 +297,152 @@ const SuppliersList = () => {
         )}
 
         <div className="table-responsive">
-          <table className="table">
+          <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
-              <tr>
-                <th>{t('suppliers.name')}</th>
-                <th>{t('suppliers.contact')}</th>
-                <th>{t('suppliers.phone')}</th>
-                <th>{t('suppliers.email')}</th>
-                <th>{language === 'ar' ? 'العنوان' : 'Address'}</th>
-                <th>{language === 'ar' ? 'الموقع' : 'Location'}</th>
-                <th>{t('common.status')}</th>
-                <th style={{ textAlign: 'right' }}>{t('common.actions')}</th>
+              <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('suppliers.name')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('suppliers.contact')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('suppliers.phone')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('suppliers.email')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{language === 'ar' ? 'العنوان' : 'Address'}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{language === 'ar' ? 'الموقع' : 'Location'}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('common.status')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: 'var(--spacing-8)' }}>{t('common.loading')}</td>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '28px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>{t('common.loading')}</td>
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: 'var(--spacing-8)', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '28px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
                     {t('common.noData')}
                   </td>
                 </tr>
               ) : (
                 suppliers.map((supplier) => (
-                  <tr key={supplier.id}>
-                    <td style={{ fontWeight: 500 }}>{supplier.name}</td>
-                    <td>{supplier.contact_person || '-'}</td>
-                    <td>{supplier.phone || '-'}</td>
-                    <td>{supplier.email || '-'}</td>
-                    <td>
-                      <span style={{ fontSize: '0.875rem' }}>
-                        {(supplier.address || supplier.location) ? (supplier.address || supplier.location) : (language === 'ar' ? 'غير محدد' : 'Not set')}
+                  <tr key={supplier.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                      {supplier.name}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                      {supplier.contact_person || '-'}
+                    </td>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '0.8125rem', fontFamily: 'monospace', color: 'var(--color-text-secondary)' }}>
+                        {supplier.phone || '-'}
                       </span>
                     </td>
-                    <td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                      {supplier.email || '-'}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                      {(supplier.address || supplier.location) ? (supplier.address || supplier.location) : (language === 'ar' ? 'غير محدد' : 'Not set')}
+                    </td>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                       {(() => {
                         const mapsUrl = extractMapsUrl(supplier);
-                        
                         return mapsUrl ? (
-                          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 600, fontSize: '0.875rem' }}>
-                            📍 {language === 'ar' ? 'عرض الموقع' : 'View Location'}
+                          <a 
+                            href={mapsUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              color: 'var(--color-primary)', 
+                              textDecoration: 'none', 
+                              fontWeight: 600, 
+                              fontSize: '0.75rem',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                              border: '1px solid rgba(59, 130, 246, 0.2)'
+                            }}
+                          >
+                            📍 {language === 'ar' ? 'الموقع' : 'Location'}
                           </a>
                         ) : (
-                          <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
-                            {language === 'ar' ? 'غير محدد' : 'Not set'}
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
+                            -
                           </span>
                         );
                       })()}
                     </td>
-                    <td>
-                      <span className={`badge ${supplier.active ? 'badge-success' : 'badge-neutral'}`}>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '3px 9px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          backgroundColor: supplier.active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                          color: supplier.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)',
+                        }}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: supplier.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)' }} />
                         {supplier.active ? t('common.active') : t('common.inactive')}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {hasPermission('suppliers.update') && (
-                        <button className="btn btn-secondary" style={{ padding: '6px', marginRight: '4px' }} onClick={() => openModal(supplier)}>
-                          <Edit2 size={16} />
-                        </button>
-                      )}
-                      {hasPermission('suppliers.deactivate') && (
-                        <button className="btn btn-danger" style={{ padding: '6px' }} onClick={() => confirmDeleteClick(supplier.id)} title={t('common.delete')}>
-                          <Trash2 size={16} />
-                        </button>
-                      )}
+                    <td style={{ padding: '8px 14px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        flexWrap: 'nowrap',
+                        verticalAlign: 'middle'
+                      }}>
+                        {hasPermission('suppliers.update') && (
+                          <button 
+                            type="button"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              backgroundColor: 'var(--color-surface)',
+                              color: 'var(--color-primary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onClick={() => openModal(supplier)}
+                            title={t('common.edit')}
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                        )}
+                        {hasPermission('suppliers.deactivate') && (
+                          <button 
+                            type="button"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                              color: 'rgb(239, 68, 68)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onClick={() => confirmDeleteClick(supplier.id)} 
+                            title={t('common.delete')}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

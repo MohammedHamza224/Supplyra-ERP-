@@ -7,6 +7,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 
 const CustomersList = () => {
   const { t, language } = useTranslation();
+  const isRtl = language === 'ar';
   const { hasPermission } = useAuth();
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,43 +52,35 @@ const CustomersList = () => {
       setFetchError(null);
       if (showLoader) setLoading(true);
       
-      // Step 1: Query customers with joined locations dynamically
+      // Step 1: Query customers base table safely without risk of missing join columns
       let { data, error } = await supabase
         .from('customers')
-        .select(`
-          *,
-          customer_locations(*)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      // Fallback if joined query fails for any reason
       if (error) {
-        console.warn('Customer join query notice, falling back to base query:', error.message);
-        const fallback = await supabase
-          .from('customers')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
+        console.warn('Customer query error, retrying safe select:', error.message);
+        const fallback = await supabase.from('customers').select('*');
         if (fallback.error) throw fallback.error;
         data = fallback.data || [];
+      }
 
-        // Try to fetch locations separately
-        try {
-          const { data: locs } = await supabase.from('customer_locations').select('*');
-          if (locs && locs.length > 0) {
-            const locMap = new Map();
-            locs.forEach((l: any) => {
-              if (!locMap.has(l.customer_id)) locMap.set(l.customer_id, []);
-              locMap.get(l.customer_id).push(l);
-            });
-            data = data.map((c: any) => ({
-              ...c,
-              customer_locations: locMap.get(c.id) || []
-            }));
-          }
-        } catch (locErr) {
-          console.warn('Customer locations separate query notice:', locErr);
+      // Step 2: Try to fetch locations separately and join in memory
+      try {
+        const { data: locs, error: locErr } = await supabase.from('customer_locations').select('*');
+        if (!locErr && locs && locs.length > 0) {
+          const locMap = new Map();
+          locs.forEach((l: any) => {
+            if (!locMap.has(l.customer_id)) locMap.set(l.customer_id, []);
+            locMap.get(l.customer_id).push(l);
+          });
+          data = (data || []).map((c: any) => ({
+            ...c,
+            customer_locations: locMap.get(c.id) || []
+          }));
         }
+      } catch (locErr) {
+        console.warn('Customer locations separate query notice:', locErr);
       }
 
       // Memory filtering for search
@@ -399,89 +392,175 @@ const CustomersList = () => {
         )}
 
         <div className="table-responsive">
-          <table className="table">
+          <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
-              <tr>
-                <th>{t('customers.name')}</th>
-                <th>{t('customers.mobile')}</th>
-                <th>{t('customers.paymentType')}</th>
-                <th>{language === 'ar' ? 'العنوان' : 'Address'}</th>
-                <th>{language === 'ar' ? 'الموقع' : 'Location'}</th>
-                <th>{t('common.status')}</th>
-                <th style={{ textAlign: 'right' }}>{t('common.actions')}</th>
+              <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('customers.name')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('customers.mobile')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('customers.paymentType')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{language === 'ar' ? 'العنوان' : 'Address'}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{language === 'ar' ? 'الموقع' : 'Location'}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('common.status')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: 'var(--spacing-8)' }}>{t('common.loading')}</td>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '28px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>{t('common.loading')}</td>
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: 'var(--spacing-8)', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '28px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
                     {t('customers.noCustomers')}
                   </td>
                 </tr>
               ) : (
                 customers.map((customer) => (
-                  <tr key={customer.id}>
-                    <td style={{ fontWeight: 500 }}>{customer.name}</td>
-                    <td>{customer.phone || customer.mobile || '-'}</td>
-                    <td>
-                      <span className={`badge ${
-                        (customer.payment_type?.toLowerCase() === 'credit' || (customer.payment_terms && Number(customer.payment_terms) > 0)) ? 'badge-warning' : 'badge-success'
-                      }`}>
+                  <tr key={customer.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                      {customer.name}
+                    </td>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '0.8125rem', fontFamily: 'monospace', color: 'var(--color-text-secondary)' }}>
+                        {customer.phone || customer.mobile || '-'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        backgroundColor: (customer.payment_type?.toLowerCase() === 'credit' || (customer.payment_terms && Number(customer.payment_terms) > 0)) ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        color: (customer.payment_type?.toLowerCase() === 'credit' || (customer.payment_terms && Number(customer.payment_terms) > 0)) ? 'rgb(217, 119, 6)' : 'rgb(16, 185, 129)'
+                      }}>
                         {customer.payment_terms && Number(customer.payment_terms) > 0
                           ? (language === 'ar' ? `آجل (${customer.payment_terms} يوم)` : `Credit (${customer.payment_terms}d)`)
                           : (customer.payment_type || (language === 'ar' ? 'نقدي' : 'Cash'))}
                       </span>
                     </td>
-                    <td>
-                        {(() => {
-                           const loc = customer.customer_locations && customer.customer_locations.length > 0 ? customer.customer_locations[0] : null;
-                           const textAddress = loc?.address || customer.address;
-                           return <span style={{ fontSize: '0.875rem' }}>{textAddress ? textAddress : (language === 'ar' ? 'غير محدد' : 'Not set')}</span>;
-                        })()}
-                      </td>
-                      <td>
-                        {(() => {
-                            const loc = customer.customer_locations && customer.customer_locations.length > 0 ? customer.customer_locations[0] : null;
-                            let mapsUrl = '';
-                            if (loc) {
-                              if (loc.google_maps_url) {
-                                mapsUrl = loc.google_maps_url;
-                              } else if (loc.latitude && loc.longitude) {
-                                mapsUrl = `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`;
-                              }
-                            }
-                            
-                            return mapsUrl ? (
-                              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.875rem' }}>
-                                📌 {language === 'ar' ? 'فتح الموقع' : 'Open Location'}
-                              </a>
-                            ) : (
-                              <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
-                                📌 {language === 'ar' ? 'الموقع غير محدد' : 'Location not set'}
-                              </span>
-                            );
-                        })()}
-                      </td>
-                    <td>
-                      <span className={`badge ${customer.active ? 'badge-success' : 'badge-neutral'}`}>
+                    <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                      {(() => {
+                        const loc = customer.customer_locations && customer.customer_locations.length > 0 ? customer.customer_locations[0] : null;
+                        const textAddress = loc?.address || customer.address;
+                        return textAddress ? textAddress : (language === 'ar' ? 'غير محدد' : 'Not set');
+                      })()}
+                    </td>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      {(() => {
+                        const loc = customer.customer_locations && customer.customer_locations.length > 0 ? customer.customer_locations[0] : null;
+                        let mapsUrl = '';
+                        if (loc) {
+                          if (loc.google_maps_url) {
+                            mapsUrl = loc.google_maps_url;
+                          } else if (loc.latitude && loc.longitude) {
+                            mapsUrl = `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`;
+                          }
+                        }
+                        
+                        return mapsUrl ? (
+                          <a 
+                            href={mapsUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              color: 'var(--color-primary)', 
+                              textDecoration: 'none', 
+                              fontWeight: 600, 
+                              fontSize: '0.75rem',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                              border: '1px solid rgba(59, 130, 246, 0.2)'
+                            }}
+                          >
+                            📍 {language === 'ar' ? 'الموقع' : 'Location'}
+                          </a>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
+                            -
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '3px 9px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          backgroundColor: customer.active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                          color: customer.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)',
+                        }}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: customer.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)' }} />
                         {customer.active ? t('common.active') : t('common.inactive')}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {hasPermission('customers.update') && (
-                        <button className="btn btn-secondary" style={{ padding: '6px', marginRight: '4px' }} onClick={() => openModal(customer)}>
-                          <Edit2 size={16} />
-                        </button>
-                      )}
-                      {(hasPermission('customers.delete') || hasPermission('customers.update')) && (
-                        <button className="btn btn-danger" style={{ padding: '6px', marginRight: '4px' }} onClick={() => confirmDeleteClick(customer)} title={t('common.delete')}>
-                          <Trash2 size={16} />
-                        </button>
-                      )}
+                    <td style={{ padding: '8px 14px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        flexWrap: 'nowrap',
+                        verticalAlign: 'middle'
+                      }}>
+                        {hasPermission('customers.update') && (
+                          <button 
+                            type="button"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              backgroundColor: 'var(--color-surface)',
+                              color: 'var(--color-primary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onClick={() => openModal(customer)}
+                            title={t('common.edit')}
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                        )}
+                        {(hasPermission('customers.delete') || hasPermission('customers.update')) && (
+                          <button 
+                            type="button"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                              color: 'rgb(239, 68, 68)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onClick={() => confirmDeleteClick(customer)}
+                            title={t('common.delete')}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

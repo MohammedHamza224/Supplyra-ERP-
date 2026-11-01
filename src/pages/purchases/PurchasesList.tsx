@@ -9,6 +9,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 
 const PurchasesList = () => {
   const { t, language } = useTranslation();
+  const isRtl = language === 'ar';
   const { hasPermission } = useAuth();
   
   const [purchases, setPurchases] = useState<any[]>([]);
@@ -161,80 +162,158 @@ const PurchasesList = () => {
           )}
 
           <div className="table-responsive">
-            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
-                  <th style={{ padding: '12px' }}>{t('purchases.purchaseNumber')}</th>
-                  <th style={{ padding: '12px' }}>{t('purchases.invoiceNumber')}</th>
-                  <th style={{ padding: '12px' }}>{t('purchases.supplier')}</th>
-                  <th style={{ padding: '12px' }}>{t('purchases.warehouse')}</th>
-                  <th style={{ padding: '12px' }}>{t('purchases.date')}</th>
-                  <th style={{ padding: '12px' }}>{t('purchases.total')}</th>
-                  <th style={{ padding: '12px' }}>{t('purchases.status')}</th>
-                  <th style={{ padding: '12px', textAlign: 'right' }}>{t('common.actions')}</th>
+                <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('purchases.purchaseNumber')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('purchases.invoiceNumber')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('purchases.supplier')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('purchases.warehouse')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('purchases.date')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('purchases.total')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('purchases.status')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                  <td colSpan={8} style={{ padding: '28px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
                     {t('common.loading')}
                   </td>
                 </tr>
               ) : purchases.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                  <td colSpan={8} style={{ padding: '28px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
                     {t('purchases.noPurchases')}
                   </td>
                 </tr>
               ) : (
                 purchases.map((purchase) => {
                   const statusStyle = getStatusStyle(purchase.status);
+                  const isReceived = purchase.status === 'RECEIVED' || purchase.status === 'PAID';
                   
                   return (
-                    <tr key={purchase.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td style={{ padding: '12px', fontWeight: 500 }}>{purchase.purchase_number || '-'}</td>
-                      <td style={{ padding: '12px' }}>{purchase.invoice_number || '-'}</td>
-                      <td style={{ padding: '12px' }}>{purchase.supplier?.name || '-'}</td>
-                      <td style={{ padding: '12px' }}>{purchase.warehouse?.name || '-'}</td>
-                      <td style={{ padding: '12px' }}>{purchase.purchase_date ? new Date(purchase.purchase_date).toLocaleDateString() : (purchase.issue_date ? new Date(purchase.issue_date).toLocaleDateString() : (purchase.created_at ? new Date(purchase.created_at).toLocaleDateString() : '-'))}</td>
-                      <td style={{ padding: '12px', fontWeight: 500 }}>{Number(purchase.total_amount || purchase.grand_total || purchase.subtotal || 0).toLocaleString()} {t('products.currency')}</td>
-                      <td style={{ padding: '12px' }}>
+                    <tr key={purchase.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                         <span style={{ 
-                          display: 'inline-block', padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500,
-                          backgroundColor: statusStyle.bg, color: statusStyle.color, width: 'fit-content'
+                          fontSize: '0.75rem', 
+                          fontFamily: 'monospace', 
+                          backgroundColor: 'var(--color-background)', 
+                          border: '1px solid var(--color-border)',
+                          padding: '3px 8px', 
+                          borderRadius: '4px',
+                          color: 'var(--color-text-primary)'
                         }}>
+                          {purchase.purchase_number || '-'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                        {purchase.invoice_number || '-'}
+                      </td>
+                      <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                        {purchase.supplier?.name || '-'}
+                      </td>
+                      <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                        {purchase.warehouse?.name || '-'}
+                      </td>
+                      <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                        {purchase.purchase_date ? new Date(purchase.purchase_date).toLocaleDateString() : (purchase.issue_date ? new Date(purchase.issue_date).toLocaleDateString() : (purchase.created_at ? new Date(purchase.created_at).toLocaleDateString() : '-'))}
+                      </td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          {Number(purchase.total_amount || purchase.grand_total || purchase.subtotal || 0).toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginInlineStart: '4px' }}>
+                          {t('products.currency')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        <span style={{ 
+                          display: 'inline-flex', 
+                          alignItems: 'center', 
+                          gap: '5px',
+                          padding: '3px 9px', 
+                          borderRadius: '12px', 
+                          fontSize: '0.75rem', 
+                          fontWeight: 600,
+                          backgroundColor: statusStyle.bg, 
+                          color: statusStyle.color
+                        }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusStyle.color }} />
                           {t(`purchases.${purchase.status.toLowerCase()}`) || purchase.status}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                      <td style={{ padding: '8px 14px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          flexWrap: 'nowrap',
+                          verticalAlign: 'middle'
+                        }}>
                           <button 
+                            type="button"
                             onClick={() => handleView(purchase)}
-                            className="btn btn-secondary"
                             title={language === 'ar' ? 'عرض الفاتورة' : 'View Details'}
-                            style={{ padding: '6px' }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              backgroundColor: 'var(--color-surface)',
+                              color: 'var(--color-text-secondary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
                           >
-                            <Eye size={16} />
+                            <Eye size={15} />
                           </button>
                           {hasPermission('purchases.update') && (
                             <button 
+                              type="button"
                               onClick={() => handleEdit(purchase)}
-                              className="btn btn-secondary"
                               title={language === 'ar' ? 'تعديل الفاتورة' : 'Edit Invoice'}
-                              style={{ padding: '6px' }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--color-border)',
+                                backgroundColor: 'var(--color-surface)',
+                                color: 'var(--color-primary)',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
                             >
-                              <Edit2 size={16} />
+                              <Edit2 size={15} />
                             </button>
                           )}
                           {(hasPermission('purchases.cancel') || hasPermission('purchases.update')) && (
                             <button 
+                              type="button"
                               onClick={() => confirmDeleteClick(purchase)}
-                              className="btn btn-danger"
                               title={language === 'ar' ? 'حذف الفاتورة' : 'Delete Invoice'}
-                              style={{ padding: '6px' }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '6px',
+                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                color: 'rgb(239, 68, 68)',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={15} />
                             </button>
                           )}
                         </div>

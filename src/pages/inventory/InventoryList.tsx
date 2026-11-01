@@ -433,25 +433,25 @@ const InventoryList = () => {
           </div>
 
           <div className="table-responsive">
-            <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left' }}>
-                  {!productId && <th style={{ padding: '12px' }}>{t('products.code')}</th>}
-                  {!productId && <th style={{ padding: '12px' }}>{t('products.name')}</th>}
-                  <th style={{ padding: '12px' }}>{t('inventory.batchNumber')}</th>
-                  <th style={{ padding: '12px' }}>{t('warehouses.title')}</th>
-                  <th style={{ padding: '12px' }}>{isRtl ? 'المتبقي' : 'Remaining'}</th>
-                  <th style={{ padding: '12px' }}>{t('inventory.cost')}</th>
-                  <th style={{ padding: '12px' }}>{t('inventory.productionDate')}</th>
-                  <th style={{ padding: '12px' }}>{t('inventory.expiryDate')}</th>
-                  <th style={{ padding: '12px' }}>{t('inventory.daysRemaining')}</th>
-                  <th style={{ padding: '12px' }}>{t('inventory.inventoryValue')}</th>
-                  <th style={{ padding: '12px' }}>{t('inventory.status')}</th>
+                <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
+                  {!productId && <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.code')}</th>}
+                  {!productId && <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('products.name')}</th>}
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.batchNumber')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('warehouses.title')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{isRtl ? 'المتبقي' : 'Remaining'}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.cost')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.productionDate')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.expiryDate')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.daysRemaining')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.inventoryValue')}</th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.status')}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={productId ? 9 : 11} style={{ textAlign: 'center', padding: '24px' }}>{t('common.loading')}</td></tr>
+                  <tr><td colSpan={productId ? 9 : 11} style={{ textAlign: 'center', padding: '28px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>{t('common.loading')}</td></tr>
                 ) : filteredBatches.length === 0 ? (
                   <tr>
                     <td colSpan={productId ? 9 : 11} style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--color-text-muted)' }}>
@@ -479,28 +479,82 @@ const InventoryList = () => {
                   </tr>
                 ) : (
                   filteredBatches.map(batch => (
-                    <tr key={batch.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      {!productId && <td style={{ padding: '12px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>{batch.product_code}</td>}
-                      {!productId && <td style={{ padding: '12px', fontWeight: 500 }}>{batch.product_name}</td>}
-                      <td style={{ padding: '12px', fontWeight: 600 }}>{batch.batch_number}</td>
-                      <td style={{ padding: '12px' }}>
+                    <tr key={batch.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                      {!productId && (
+                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                          <span style={{ 
+                            fontSize: '0.75rem', 
+                            fontFamily: 'monospace', 
+                            backgroundColor: 'var(--color-background)', 
+                            border: '1px solid var(--color-border)',
+                            padding: '3px 8px', 
+                            borderRadius: '4px',
+                            color: 'var(--color-text-primary)'
+                          }}>
+                            {batch.product_code}
+                          </span>
+                        </td>
+                      )}
+                      {!productId && (
+                        <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                          {batch.product_name}
+                        </td>
+                      )}
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        <span style={{ 
+                          fontSize: '0.75rem', 
+                          fontFamily: 'monospace', 
+                          backgroundColor: 'var(--color-background)', 
+                          border: '1px solid var(--color-border)',
+                          padding: '3px 8px', 
+                          borderRadius: '4px',
+                          color: 'var(--color-text-primary)'
+                        }}>
+                          {batch.batch_number}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Building2 size={14} color="var(--color-text-muted)"/>
-                          {batch.warehouse_name}
+                          <span>{batch.warehouse_name}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '12px', fontWeight: 700 }}>{batch.quantity}</td>
-                      <td style={{ padding: '12px', direction: 'ltr', textAlign: isRtl ? 'right' : 'left' }}>{Number(batch.purchase_price).toFixed(2)} {t('products.currency')}</td>
-                      <td style={{ padding: '12px' }}>{batch.production_date || '-'}</td>
-                      <td style={{ padding: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          {batch.quantity}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          {Number(batch.purchase_price).toFixed(2)}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginInlineStart: '4px' }}>
+                          {t('products.currency')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                        {batch.production_date || '-'}
+                      </td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
                           <Calendar size={14} color="var(--color-text-muted)"/>
-                          {batch.expiry_date}
+                          <span>{batch.expiry_date}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '12px', fontWeight: 500 }}>{batch.days_remaining}</td>
-                      <td style={{ padding: '12px', fontWeight: 700, direction: 'ltr', textAlign: isRtl ? 'right' : 'left' }}>{Number(batch.inventory_value).toFixed(2)} {t('products.currency')}</td>
-                      <td style={{ padding: '12px' }}>{getStatusBadge(batch.expiry_status)}</td>
+                      <td style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                        {batch.days_remaining} {isRtl ? 'يوم' : 'days'}
+                      </td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          {Number(batch.inventory_value).toFixed(2)}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginInlineStart: '4px' }}>
+                          {t('products.currency')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        {getStatusBadge(batch.expiry_status)}
+                      </td>
                     </tr>
                   ))
                 )}

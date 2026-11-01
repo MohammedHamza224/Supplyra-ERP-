@@ -385,47 +385,47 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
                   {isRtl ? 'المنتجات المطلوبة' : 'Order Items'} ({items.length})
                 </h3>
 
-                <div className="table-responsive" style={{ border: '1px solid var(--color-border)', borderRadius: '8px' }}>
-                  <table className="table" style={{ margin: 0 }}>
+                <div className="table-responsive" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
                     <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>{isRtl ? 'المنتج' : 'Product'}</th>
-                        <th>{isRtl ? 'الفئة' : 'Category'}</th>
-                        <th style={{ textAlign: 'center' }}>{isRtl ? 'الكمية' : 'Quantity'}</th>
-                        <th style={{ textAlign: 'right' }}>{isRtl ? 'سعر الوحدة' : 'Unit Price'}</th>
-                        <th style={{ textAlign: 'right' }}>{isRtl ? 'الإجمالي' : 'Total'}</th>
+                      <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
+                        <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', width: '40px' }}>#</th>
+                        <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{isRtl ? 'المنتج' : 'Product'}</th>
+                        <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{isRtl ? 'الفئة' : 'Category'}</th>
+                        <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', textAlign: 'center' }}>{isRtl ? 'الكمية' : 'Quantity'}</th>
+                        <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', textAlign: isRtl ? 'left' : 'right' }}>{isRtl ? 'سعر الوحدة' : 'Unit Price'}</th>
+                        <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', textAlign: isRtl ? 'left' : 'right' }}>{isRtl ? 'الإجمالي' : 'Total'}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {items.length === 0 ? (
                         <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
                             {isRtl ? 'لا توجد منتجات مسجلة' : 'No items found'}
                           </td>
                         </tr>
                       ) : (
                         items.map((item, idx) => (
-                          <tr key={item.id || idx}>
-                            <td style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{idx + 1}</td>
-                            <td style={{ fontWeight: 600 }}>
+                          <tr key={item.id || idx} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                            <td style={{ padding: '10px 14px', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>{idx + 1}</td>
+                            <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem' }}>
                               <div>{item.product?.name || (isRtl ? 'منتج غير معروف' : 'Unknown Product')}</div>
                               {item.product?.product_code && (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 400 }}>
-                                  #{item.product.product_code}
+                                <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '1px 6px', borderRadius: '4px', marginTop: '2px', display: 'inline-block' }}>
+                                  {item.product.product_code}
                                 </span>
                               )}
                             </td>
-                            <td style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-                              {item.product?.category?.name || (isRtl ? 'غير محدد' : 'Not Set')}
+                            <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                              {item.product?.category?.name || '-'}
                             </td>
-                            <td style={{ textAlign: 'center', fontWeight: 600 }}>
+                            <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, fontSize: '0.875rem' }}>
                               {item.quantity} {item.unit?.code || item.unit?.name || ''}
                             </td>
-                            <td style={{ textAlign: 'right' }}>
+                            <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontSize: '0.85rem' }}>
                               {formatCurrency(item.unit_price || item.selling_price || 0)}
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                            <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.875rem' }}>
                               {formatCurrency(item.total || (item.quantity * (item.unit_price || 0)))}
                             </td>
                           </tr>

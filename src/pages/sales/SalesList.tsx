@@ -12,6 +12,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 
 const SalesList = () => {
   const { t, language } = useTranslation();
+  const isRtl = language === 'ar';
   const { hasPermission, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -318,27 +319,27 @@ const SalesList = () => {
             </div>
 
             <div className="table-responsive">
-              <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
-                    <th style={{ padding: '12px' }}>{t('sales.orderNumber')}</th>
-                    <th style={{ padding: '12px' }}>{t('sales.date')}</th>
-                    <th style={{ padding: '12px' }}>{t('sales.customer')}</th>
-                    <th style={{ padding: '12px' }}>{t('sales.warehouse')}</th>
-                    <th style={{ padding: '12px' }}>{t('sales.grandTotal')}</th>
-                    <th style={{ padding: '12px' }}>{t('sales.status')}</th>
-                    <th style={{ padding: '12px' }}>{t('sales.paymentStatus')}</th>
-                    <th style={{ padding: '12px', textAlign: 'right' }}>{t('common.actions')}</th>
+                  <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
+                    <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('sales.orderNumber')}</th>
+                    <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('sales.date')}</th>
+                    <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('sales.customer')}</th>
+                    <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('sales.warehouse')}</th>
+                    <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('sales.grandTotal')}</th>
+                    <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('sales.status')}</th>
+                    <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('sales.paymentStatus')}</th>
+                    <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: 'var(--spacing-8)' }}>{t('common.loading')}</td>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '28px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>{t('common.loading')}</td>
                     </tr>
                   ) : sales.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: 'var(--spacing-8)', color: 'var(--color-text-muted)' }}>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '28px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
                         {t('common.noData')}
                       </td>
                     </tr>
@@ -349,17 +350,50 @@ const SalesList = () => {
                       const aStyle = getApprovalStyle(sale.discount_approval_status);
                       
                       return (
-                        <tr key={sale.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                          <td style={{ padding: '12px', fontWeight: 500 }}>{sale.order_number || '-'}</td>
-                          <td style={{ padding: '12px' }}>{sale.order_date ? new Date(sale.order_date).toLocaleDateString() : '-'}</td>
-                          <td style={{ padding: '12px' }}>{sale.customer?.name || t('sales.walkIn')}</td>
-                          <td style={{ padding: '12px' }}>{sale.warehouse_name_display || sale.warehouse?.name || '-'}</td>
-                          <td style={{ padding: '12px', fontWeight: 500 }}>{Number(sale.grand_total || 0).toLocaleString()} {t('products.currency')}</td>
-                          <td style={{ padding: '12px' }}>
+                        <tr key={sale.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                             <span style={{ 
-                              display: 'inline-block', padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500,
-                              backgroundColor: statusStyle.bg, color: statusStyle.color
+                              fontSize: '0.75rem', 
+                              fontFamily: 'monospace', 
+                              backgroundColor: 'var(--color-background)', 
+                              border: '1px solid var(--color-border)',
+                              padding: '3px 8px', 
+                              borderRadius: '4px',
+                              color: 'var(--color-text-primary)'
                             }}>
+                              {sale.order_number || '-'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                            {sale.order_date ? new Date(sale.order_date).toLocaleDateString() : '-'}
+                          </td>
+                          <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                            {sale.customer?.name || t('sales.walkIn')}
+                          </td>
+                          <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                            {sale.warehouse_name_display || sale.warehouse?.name || '-'}
+                          </td>
+                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                              {Number(sale.grand_total || 0).toLocaleString()}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginInlineStart: '4px' }}>
+                              {t('products.currency')}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                            <span style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '5px',
+                              padding: '3px 9px', 
+                              borderRadius: '12px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: 600,
+                              backgroundColor: statusStyle.bg, 
+                              color: statusStyle.color
+                            }}>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusStyle.color }} />
                               {t(`sales.${sale.status?.toLowerCase()}`) || sale.status}
                             </span>
                             {aStyle && (
@@ -373,52 +407,113 @@ const SalesList = () => {
                               </div>
                             )}
                           </td>
-                          <td style={{ padding: '12px' }}>
+                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                             <span style={{ 
-                              display: 'inline-block', padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500,
-                              backgroundColor: pStatusStyle.bg, color: pStatusStyle.color
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: 600,
+                              backgroundColor: pStatusStyle.bg, 
+                              color: pStatusStyle.color
                             }}>
                               {t(`sales.${sale.payment_status?.toLowerCase()}`) || sale.payment_status}
                             </span>
                           </td>
-                          <td style={{ padding: '12px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <td style={{ padding: '8px 14px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              flexWrap: 'nowrap',
+                              verticalAlign: 'middle'
+                            }}>
                               {sale.discount_approval_status === 'PENDING' && hasPermission('sales.discount.approve') && (
                                 <button 
+                                  type="button"
                                   onClick={() => handleOpenApproval(sale.id)}
-                                  className="btn btn-secondary"
                                   title={t('sales.viewApproval') || 'Review Approval'}
-                                  style={{ padding: '6px' }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '6px',
+                                    border: '1px solid var(--color-border)',
+                                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                    color: 'rgb(217, 119, 6)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
                                 >
-                                  <ShieldCheck size={16} />
+                                  <ShieldCheck size={15} />
                                 </button>
                               )}
                               <button 
+                                type="button"
                                 onClick={() => handleOpenDetails(sale)}
-                                className="btn btn-secondary"
                                 title={language === 'ar' ? 'عرض الفاتورة' : 'View Invoice'}
-                                style={{ padding: '6px' }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '6px',
+                                  border: '1px solid var(--color-border)',
+                                  backgroundColor: 'var(--color-surface)',
+                                  color: 'var(--color-text-secondary)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
                               >
-                                <Eye size={16} />
+                                <Eye size={15} />
                               </button>
                               {hasPermission('sales.update') && (
                                 <button 
+                                  type="button"
                                   onClick={() => handleOpenForm(sale)}
-                                  className="btn btn-secondary"
                                   title={language === 'ar' ? 'تعديل الفاتورة' : 'Edit Sale'}
-                                  style={{ padding: '6px' }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '6px',
+                                    border: '1px solid var(--color-border)',
+                                    backgroundColor: 'var(--color-surface)',
+                                    color: 'var(--color-primary)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
                                 >
-                                  <Edit2 size={16} />
+                                  <Edit2 size={15} />
                                 </button>
                               )}
                               {(hasPermission('sales.cancel') || hasPermission('sales.update')) && (
                                 <button 
+                                  type="button"
                                   onClick={() => confirmDeleteClick(sale)}
-                                  className="btn btn-danger"
                                   title={language === 'ar' ? 'حذف الفاتورة' : 'Delete Invoice'}
-                                  style={{ padding: '6px' }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                    color: 'rgb(239, 68, 68)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
                                 >
-                                  <Trash2 size={16} />
+                                  <Trash2 size={15} />
                                 </button>
                               )}
                             </div>
