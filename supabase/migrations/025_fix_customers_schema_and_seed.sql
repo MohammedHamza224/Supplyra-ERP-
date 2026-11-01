@@ -145,3 +145,74 @@ VALUES
 ON CONFLICT (code) DO UPDATE 
 SET name = EXCLUDED.name, location = EXCLUDED.location, active = true;
 
+-- 6. Seed Demo Team Users (Sales, Warehouse, Purchasing)
+DO $$
+DECLARE
+    v_sales_role UUID;
+    v_warehouse_role UUID;
+    v_purchasing_role UUID;
+    
+    v_sales_id UUID := '11111111-1111-1111-1111-111111111111';
+    v_warehouse_id UUID := '22222222-2222-2222-2222-222222222222';
+    v_purchasing_id UUID := '33333333-3333-3333-3333-333333333333';
+BEGIN
+    SELECT id INTO v_sales_role FROM public.roles WHERE name = 'Sales';
+    SELECT id INTO v_warehouse_role FROM public.roles WHERE name = 'Warehouse';
+    SELECT id INTO v_purchasing_role FROM public.roles WHERE name = 'Purchasing';
+
+    -- 1. Sales: sales@supplyra.com (Pass: Supplyra@123)
+    INSERT INTO auth.users (
+        id, instance_id, email, encrypted_password, email_confirmed_at, 
+        raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud
+    ) VALUES (
+        v_sales_id, '00000000-0000-0000-0000-000000000000',
+        'sales@supplyra.com',
+        crypt('Supplyra@123', gen_salt('bf')),
+        NOW(),
+        '{"provider":"email","providers":["email"]}',
+        '{"first_name":"خالد","last_name":"العتيبي"}',
+        NOW(), NOW(), 'authenticated', 'authenticated'
+    ) ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO public.profiles (id, first_name, last_name, role_id, active)
+    VALUES (v_sales_id, 'خالد', 'العتيبي', v_sales_role, true)
+    ON CONFLICT (id) DO UPDATE SET role_id = v_sales_role, active = true;
+
+    -- 2. Warehouse: warehouse@supplyra.com (Pass: Supplyra@123)
+    INSERT INTO auth.users (
+        id, instance_id, email, encrypted_password, email_confirmed_at, 
+        raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud
+    ) VALUES (
+        v_warehouse_id, '00000000-0000-0000-0000-000000000000',
+        'warehouse@supplyra.com',
+        crypt('Supplyra@123', gen_salt('bf')),
+        NOW(),
+        '{"provider":"email","providers":["email"]}',
+        '{"first_name":"فهد","last_name":"الغامدي"}',
+        NOW(), NOW(), 'authenticated', 'authenticated'
+    ) ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO public.profiles (id, first_name, last_name, role_id, active)
+    VALUES (v_warehouse_id, 'فهد', 'الغامدي', v_warehouse_role, true)
+    ON CONFLICT (id) DO UPDATE SET role_id = v_warehouse_role, active = true;
+
+    -- 3. Purchasing: purchasing@supplyra.com (Pass: Supplyra@123)
+    INSERT INTO auth.users (
+        id, instance_id, email, encrypted_password, email_confirmed_at, 
+        raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud
+    ) VALUES (
+        v_purchasing_id, '00000000-0000-0000-0000-000000000000',
+        'purchasing@supplyra.com',
+        crypt('Supplyra@123', gen_salt('bf')),
+        NOW(),
+        '{"provider":"email","providers":["email"]}',
+        '{"first_name":"عبدالله","last_name":"الشهري"}',
+        NOW(), NOW(), 'authenticated', 'authenticated'
+    ) ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO public.profiles (id, first_name, last_name, role_id, active)
+    VALUES (v_purchasing_id, 'عبدالله', 'الشهري', v_purchasing_role, true)
+    ON CONFLICT (id) DO UPDATE SET role_id = v_purchasing_role, active = true;
+END;
+$$;
+
