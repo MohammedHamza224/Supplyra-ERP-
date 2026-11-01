@@ -9,7 +9,8 @@ import ProductSuppliers from './ProductSuppliers';
 import LOVSelect from '../../components/ui/LOVSelect';
 
 const ProductsList = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const isRtl = language === 'ar';
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
@@ -568,14 +569,28 @@ if (
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', minWidth: '180px' }}>
+            <div style={{ position: 'relative', width: '240px', maxWidth: '100%' }}>
+              <Search 
+                size={16} 
+                style={{ 
+                  position: 'absolute', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  right: isRtl ? '12px' : 'auto', 
+                  left: isRtl ? 'auto' : '12px', 
+                  color: 'var(--color-text-muted)',
+                  pointerEvents: 'none'
+                }} 
+              />
               <input
                 type="text"
-                placeholder={t('common.search') || 'بحث...'}
+                placeholder={t('common.search') || 'بحث عن منتج...'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
-                  padding: '7px 12px',
+                  padding: '8px 12px',
+                  paddingRight: isRtl ? '36px' : '12px',
+                  paddingLeft: isRtl ? '12px' : '36px',
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--color-border)',
                   fontSize: '0.85rem',
@@ -583,7 +598,8 @@ if (
                   color: 'var(--color-text-primary)',
                   outline: 'none',
                   minHeight: '38px',
-                  width: '100%'
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}
               />
             </div>
@@ -593,9 +609,9 @@ if (
                 className="btn btn-primary"
                 onClick={() => openModal()}
                 type="button"
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '38px' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '38px', fontSize: '0.875rem' }}
               >
-                <Plus size={18} />
+                <Plus size={16} />
                 {t('products.newProduct')}
               </button>
             )}
@@ -604,27 +620,45 @@ if (
 
         <div className="card-body" style={{ padding: 0 }}>
           <div className="table-responsive">
-            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
+            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left' }}>
-                <th style={{ padding: '12px' }}>{t('products.code')}</th>
-                <th style={{ padding: '12px' }}>{t('products.name')}</th>
-                <th style={{ padding: '12px' }}>{t('products.category')}</th>
-                <th style={{ padding: '12px' }}>{t('products.brand')}</th>
-                  <th style={{ padding: '12px' }}>{t('products.supplier')}</th>
-                <th style={{ padding: '12px' }}>{t('products.price')}</th>
-                <th style={{ padding: '12px' }}>{t('products.status')}</th>
-                <th style={{ padding: '12px' }}>{t('products.actions')}</th>
+              <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.code')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('products.name')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.category')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.brand')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('products.supplier')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.price')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.status')}</th>
+                <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('products.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {products.map((product) => (
-                <tr key={product.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '12px' }}>{product.product_code}</td>
-                  <td style={{ padding: '12px', fontWeight: 500 }}>{product.name}</td>
-                  <td style={{ padding: '12px' }}>{product.category?.name || '-'}</td>
-                  <td style={{ padding: '12px' }}>{product.brand?.name || '-'}</td>
-                  <td style={{ padding: '12px' }}>
+                <tr key={product.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                    <span style={{ 
+                      fontSize: '0.75rem', 
+                      fontFamily: 'monospace', 
+                      backgroundColor: 'var(--color-background)', 
+                      border: '1px solid var(--color-border)',
+                      padding: '3px 8px', 
+                      borderRadius: '4px',
+                      color: 'var(--color-text-primary)'
+                    }}>
+                      {product.product_code}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                    {product.name}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                    {product.category?.name || '-'}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                    {product.brand?.name || '-'}
+                  </td>
+                  <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
                     {(() => {
                       const ps = product.product_suppliers || [];
                       if (ps.length === 0) return '-';
@@ -633,60 +667,113 @@ if (
                       return ps.length > 1 ? `${name} +${ps.length - 1}` : name;
                     })()}
                   </td>
-                  <td style={{ padding: '12px', direction: 'ltr', textAlign: 'left' }}>{Number(product.selling_price).toFixed(2)} {t('products.currency')}</td>
-                  <td style={{ padding: '12px' }}>
-                    <span
-                        style={{
-                          padding: '4px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          fontWeight: 500,
-                          backgroundColor: product.active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                          color: product.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)',
-                        }}
-                      >
-                        {product.active ? t('products.active') : t('products.inactive')}
-                      </span>
-
+                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      {Number(product.selling_price).toFixed(2)}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginInlineStart: '4px' }}>
+                      {t('products.currency')}
+                    </span>
                   </td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>
-                    {hasPermission('products.update') && (
-                      <button 
-                        className="btn btn-secondary" 
-                        style={{ padding: '6px', marginRight: '4px' }} 
-                        onClick={() => openModal(product)}
-                        title={t('products.edit')}
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    )}
-                    {hasPermission('products.update') && (
-                      <button 
-                        className="btn btn-secondary" 
-                        style={{ padding: '6px', marginRight: '4px' }} 
-                        onClick={() => navigate('/inventory?product_id=' + product.id)}
-                        title={t('products.manageStock')}
-                      >
-                        <Package size={16} />
-                      </button>
-                    )}
-                    {hasPermission('products.delete') && (
-                      <button 
-                        type="button"
-                        className="btn btn-danger" 
-                        style={{ padding: '6px' }} 
-                        onClick={() => confirmDeleteClick(product.id)}
-                        title={t('common.delete')}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
+                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '3px 9px',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        backgroundColor: product.active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        color: product.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)',
+                      }}
+                    >
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: product.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)' }} />
+                      {product.active ? t('products.active') : t('products.inactive')}
+                    </span>
+                  </td>
+                  <td style={{ padding: '8px 14px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      flexWrap: 'nowrap',
+                      verticalAlign: 'middle'
+                    }}>
+                      {hasPermission('products.update') && (
+                        <button 
+                          type="button"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                            color: 'var(--color-text-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onClick={() => navigate('/inventory?product_id=' + product.id)}
+                          title={t('products.manageStock')}
+                        >
+                          <Package size={15} />
+                        </button>
+                      )}
+                      {hasPermission('products.update') && (
+                        <button 
+                          type="button"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                            color: 'var(--color-primary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onClick={() => openModal(product)}
+                          title={t('products.edit')}
+                        >
+                          <Edit2 size={15} />
+                        </button>
+                      )}
+                      {hasPermission('products.delete') && (
+                        <button 
+                          type="button"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                            color: 'rgb(239, 68, 68)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onClick={() => confirmDeleteClick(product.id)}
+                          title={t('common.delete')}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                  <td colSpan={8} style={{ padding: '28px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
                     {t('products.noProducts')}
                   </td>
                 </tr>

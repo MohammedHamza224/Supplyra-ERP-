@@ -34,6 +34,12 @@ const UserForm: React.FC<UserFormProps> = ({ user, roles, onClose, onSuccess }) 
 
     try {
       if (user) {
+        if (user.id && typeof user.id === 'string' && user.id.startsWith('demo-')) {
+          // Demo user edit in frontend
+          onSuccess();
+          return;
+        }
+
         // Try Edge Function first
         let edgeUpdated = false;
         try {
