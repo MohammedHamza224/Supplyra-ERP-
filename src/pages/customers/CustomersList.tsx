@@ -275,7 +275,7 @@ const CustomersList = () => {
       
       <div className="card-body" style={{ padding: 0 }}>
         <div style={{ padding: 'var(--spacing-4)', borderBottom: '1px solid var(--color-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 12px', width: '300px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 12px', width: '100%', maxWidth: '300px' }}>
             <Search size={16} color="var(--color-text-muted)" />
             <input 
               type="text" 
@@ -460,7 +460,7 @@ const CustomersList = () => {
                       <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>{t('customers.name')} *</label>
                       <input type="text" className="form-input" style={{ padding: '6px 8px', fontSize: '0.875rem' }} value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '12px' }}>
                       <div>
                         <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>{t('customers.mobile')}</label>
                         <input type="text" className="form-input" style={{ padding: '6px 8px', fontSize: '0.875rem' }} value={formData.mobile} onChange={(e) => setFormData({ ...formData, mobile: e.target.value })} />

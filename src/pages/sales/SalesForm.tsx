@@ -21,6 +21,13 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
   const [successOrder, setSuccessOrder] = useState<any>(null);
   const [pendingApprovalOrder, setPendingApprovalOrder] = useState<any>(null);
   const [error, setError] = useState('');
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   
   const [customers, setCustomers] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -162,6 +169,12 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== index));
     }
+  };
+
+  const handleQtyStep = (index: number, delta: number) => {
+    const current = Number(items[index].quantity) || 1;
+    const next = Math.max(1, current + delta);
+    handleItemChange(index, 'quantity', next);
   };
 
   const calculateSubtotal = () => items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
@@ -634,7 +647,123 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
 
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '12px', borderBottom: '1px solid var(--color-border)', paddingBottom: '6px' }}>{t('sales.items')}</h3>
 
-            <div style={{ overflowX: 'auto', marginBottom: '12px' }}>
+            {isMobile ? (
+              /* Mobile Card-style items */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+                {items.map((item, index) => (
+                  <div key={item.id} style={{ backgroundColor: 'var(--color-background)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-primary)' }}>
+                        {isRtl ? `بند #${index + 1}` : `Item #${index + 1}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(index)}
+                        disabled={items.length === 1}
+                        style={{
+                          padding: '4px 8px', background: 'rgba(239, 68, 68, 0.1)', border: 'none', borderRadius: '4px',
+                          color: items.length === 1 ? 'var(--color-border)' : '#ef4444',
+                          cursor: items.length === 1 ? 'not-allowed' : 'pointer',
+                          display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem'
+                        }}
+                      >
+                        <Trash2 size={14} />
+                        <span>{isRtl ? 'حذف' : 'Remove'}</span>
+                      </button>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, marginBottom: '4px' }}>{t('sales.product')} *</label>
+                      <select
+                        required
+                        value={item.product_id}
+                        onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', backgroundColor: 'var(--color-surface)', outline: 'none' }}
+                      >
+                        <option value="">{isRtl ? 'اختر المنتج...' : 'Select Product...'}</option>
+                        {products
+                          .filter(p => (stockMap[p.id] || []).length > 0)
+                          .map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, marginBottom: '4px' }}>{t('sales.warehouse')} *</label>
+                      <select
+                        required
+                        disabled={!item.product_id}
+                        value={item.warehouse_id}
+                        onChange={(e) => {
+                          handleItemChange(index, 'warehouse_id', e.target.value);
+                          handleItemChange(index, 'quantity', 1);
+                        }}
+                        style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', backgroundColor: 'var(--color-surface)', outline: 'none', opacity: !item.product_id ? 0.5 : 1 }}
+                      >
+                        <option value="">{isRtl ? 'اختر المستودع...' : 'Select Warehouse...'}</option>
+                        {(stockMap[item.product_id] || []).map((w: any) => (
+                          <option key={w.id} value={w.id}>{w.name} (المتاح: {w.qty})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px', alignItems: 'center' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, marginBottom: '4px' }}>{t('sales.quantity')}</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleQtyStep(index, -1)}
+                            style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '6px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)', fontSize: '1.1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            required
+                            min="0.01"
+                            step="0.01"
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                            style={{ width: '100%', height: '36px', textAlign: 'center', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 600, outline: 'none', backgroundColor: 'var(--color-surface)' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleQtyStep(index, 1)}
+                            style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '6px', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)', fontSize: '1.1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, marginBottom: '4px' }}>{t('sales.price')}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unit_price}
+                          onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                          style={{ width: '100%', height: '36px', padding: '6px 8px', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', backgroundColor: 'var(--color-surface)' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--color-border)', paddingTop: '8px', marginTop: '2px' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{t('sales.total')}:</span>
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-primary)' }}>
+                        {Number(item.total).toLocaleString(undefined, {minimumFractionDigits: 2})} {t('products.currency')}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+            <div className="table-responsive" style={{ overflowX: 'auto', marginBottom: '12px' }}>
               <div style={{ minWidth: '600px' }}>
                 {/* Items Grid Header */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 2fr) minmax(140px, 1.5fr) 90px 100px 90px 30px', gap: '12px', padding: '0 12px', marginBottom: '6px', color: 'var(--color-text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
@@ -728,6 +857,7 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
                 </div>
               </div>
             </div>
+            )}
 
             <button type="button" onClick={addItem} className="btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: 'var(--color-background)', border: '1px dashed var(--color-primary)', color: 'var(--color-primary)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem', marginBottom: '16px' }}>
               <Plus size={16} /> {isRtl ? 'إضافة سطر منتج' : 'Add Product Row'}

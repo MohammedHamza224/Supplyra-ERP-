@@ -1085,11 +1085,11 @@ export default function AIAssistant() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', minHeight: '500px', gap: '1rem' }}>
       <div>
-        <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Sparkles size={28} style={{ color: '#8b5cf6' }} />
-          {isRtl ? 'المساعد الذكي' : 'AI Assistant'}
+        <h1 style={{ margin: 0, fontSize: 'clamp(1.3rem, 4vw, 1.75rem)', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Sparkles size={28} style={{ color: '#8b5cf6', flexShrink: 0 }} />
+          <span>{isRtl ? 'المساعد الذكي' : 'AI Assistant'}</span>
         </h1>
         <p style={{ margin: '0.5rem 0 0', color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
           {isRtl ? 'اطرح أسئلتك بأي صياغة طبيعية عن المبيعات، المشتريات، المخزون، والعملاء واحصل على إجابات مباشرة من بيانات النظام' : 'Ask questions naturally about sales, purchases, stock, and customers to query live ERP data'}
@@ -1098,9 +1098,9 @@ export default function AIAssistant() {
 
       <div style={{ flex: 1, backgroundColor: 'var(--color-surface)', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Messages Scroll Area */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'clamp(12px, 3vw, 24px)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {messages.map(msg => (
-            <div key={msg.id} style={{ display: 'flex', gap: '1rem', alignSelf: msg.role === 'user' ? (isRtl ? 'flex-end' : 'flex-end') : 'flex-start', maxWidth: '85%', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
+            <div key={msg.id} style={{ display: 'flex', gap: '0.75rem', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: msg.role === 'user' ? 'var(--color-primary)' : '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
                 {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
               </div>

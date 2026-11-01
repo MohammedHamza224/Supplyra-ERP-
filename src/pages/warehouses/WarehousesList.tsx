@@ -219,7 +219,7 @@ const WarehousesList = () => {
       
       <div className="card-body" style={{ padding: 0 }}>
         <div style={{ padding: 'var(--spacing-4)', borderBottom: '1px solid var(--color-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 12px', width: '300px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 12px', width: '100%', maxWidth: '300px' }}>
             <Search size={16} color="var(--color-text-muted)" />
             <input 
               type="text" 
@@ -343,7 +343,7 @@ const WarehousesList = () => {
                     {formError}
                   </div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '16px' }}>
                   <div>
                     <label className="form-label">{t('warehouses.code')} *</label>
                     <input type="text" className="form-input" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required />

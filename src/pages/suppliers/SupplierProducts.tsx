@@ -44,7 +44,8 @@ const SupplierProducts: React.FC<SupplierProductsProps> = ({ supplierId }) => {
       <h4 style={{ margin: '0 0 16px 0' }}>{t('product_suppliers.suppliedProducts')}</h4>
       
       {suppliedProducts.length > 0 ? (
-        <table className="table" style={{ width: '100%', fontSize: '0.875rem' }}>
+        <div className="table-responsive">
+          <table className="table" style={{ width: '100%', fontSize: '0.875rem' }}>
           <thead>
             <tr>
               <th style={{ padding: '8px' }}>{t('products.name')}</th>
@@ -72,6 +73,7 @@ const SupplierProducts: React.FC<SupplierProductsProps> = ({ supplierId }) => {
             ))}
           </tbody>
         </table>
+        </div>
       ) : (
         <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
           {t('product_suppliers.noSuppliers')}

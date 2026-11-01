@@ -229,9 +229,10 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
         {/* Modal Header */}
         <div style={{
           padding: '12px 20px', borderBottom: '1px solid var(--color-border)',
-          backgroundColor: 'var(--color-surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          backgroundColor: 'var(--color-surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          flexWrap: 'wrap', gap: '10px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <FileText size={20} color="var(--color-primary)" />
             <div>
               <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
@@ -253,12 +254,12 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
               onClick={() => printInvoice(sale, items, 'SUPPLYRA', '', language)} 
               className="btn btn-secondary" 
               title={isRtl ? 'طباعة الفاتورة' : 'Print Invoice'}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', color: 'var(--color-primary)', fontSize: '0.8rem' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', minHeight: '38px', color: 'var(--color-primary)', fontSize: '0.85rem' }}
             >
               <Printer size={16} />
               <span>{isRtl ? 'طباعة' : 'Print'}</span>
             </button>
-            <button onClick={onClose} className="btn btn-secondary" style={{ padding: '5px 8px' }}>
+            <button onClick={onClose} className="btn btn-secondary" style={{ padding: '6px 10px', minHeight: '38px' }} aria-label="Close">
               <X size={18} color="var(--color-text-secondary)" />
             </button>
           </div>
@@ -280,7 +281,7 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
           ) : sale ? (
             <>
               {/* 1. Header Metadata Section */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', backgroundColor: 'var(--color-background)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '12px', backgroundColor: 'var(--color-background)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
                 
                 <div>
                   <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>
@@ -508,8 +509,9 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
 
         {/* Modal Footer */}
         <div style={{
-          padding: '10px 20px', borderTop: '1px solid var(--color-border)',
-          backgroundColor: 'var(--color-surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          padding: '12px 20px', borderTop: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          flexWrap: 'wrap', gap: '10px'
         }}>
           <div>
             {(hasPermission('sales.cancel') || hasPermission('sales.update')) && sale?.status !== 'CANCELLED' && (
@@ -517,9 +519,9 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
                 onClick={handleCancelSale}
                 disabled={cancelling}
                 className="btn btn-danger"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '5px 12px' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', padding: '8px 14px', minHeight: '38px' }}
               >
-                <XCircle size={15} />
+                <XCircle size={16} />
                 {cancelling ? (isRtl ? 'جاري الإلغاء...' : 'Cancelling...') : (isRtl ? 'إلغاء الفاتورة' : 'Cancel Sale')}
               </button>
             )}
@@ -528,27 +530,27 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
                 onClick={handleDeleteCancelledSale}
                 disabled={deleting}
                 className="btn btn-danger"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '5px 12px' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', padding: '8px 14px', minHeight: '38px' }}
               >
-                <Trash2 size={15} />
+                <Trash2 size={16} />
                 {deleting ? (isRtl ? 'جاري الحذف...' : 'Deleting...') : (isRtl ? 'حذف الفاتورة نهائياً' : 'Delete Invoice')}
               </button>
             )}
           </div>
           
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button 
               onClick={() => printInvoice(sale, items, 'SUPPLYRA', '', language)}
               className="btn btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', padding: '5px 12px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', padding: '8px 14px', minHeight: '38px' }}
             >
-              <Printer size={15} />
+              <Printer size={16} />
               {isRtl ? 'طباعة الفاتورة' : 'Print Invoice'}
             </button>
             <button
               onClick={onClose}
               className="btn btn-primary"
-              style={{ fontSize: '0.8rem', padding: '5px 16px' }}
+              style={{ fontSize: '0.85rem', padding: '8px 18px', minHeight: '38px' }}
             >
               {isRtl ? 'إغلاق' : 'Close'}
             </button>

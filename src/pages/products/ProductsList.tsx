@@ -554,7 +554,7 @@ if (
   return (
     <div className="page-container">
       <div className="card">
-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Package size={28} color="var(--color-primary)" />
             <div>
@@ -567,21 +567,44 @@ if (
             </div>
           </div>
 
-          {hasPermission('products.create') && (
-            <button
-              className="btn btn-primary"
-              onClick={() => openModal()}
-              type="button"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <Plus size={18} />
-              {t('products.newProduct')}
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', minWidth: '180px' }}>
+              <input
+                type="text"
+                placeholder={t('common.search') || 'بحث...'}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                  fontSize: '0.85rem',
+                  backgroundColor: 'var(--color-background)',
+                  color: 'var(--color-text-primary)',
+                  outline: 'none',
+                  minHeight: '38px',
+                  width: '100%'
+                }}
+              />
+            </div>
+
+            {hasPermission('products.create') && (
+              <button
+                className="btn btn-primary"
+                onClick={() => openModal()}
+                type="button"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '38px' }}
+              >
+                <Plus size={18} />
+                {t('products.newProduct')}
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="card-body">
-          <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="card-body" style={{ padding: 0 }}>
+          <div className="table-responsive">
+            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left' }}>
                 <th style={{ padding: '12px' }}>{t('products.code')}</th>
@@ -670,6 +693,7 @@ if (
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -736,7 +760,7 @@ if (
                 )}
 
                 {/* Row 1: Name & Code */}
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '12px' }}>
                   <div>
                     <label htmlFor="name" style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('products.name')} *</label>
                     <input
@@ -764,7 +788,7 @@ if (
                 </div>
 
                 {/* Row 2: Category, Brand, Unit, Supplier */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '12px' }}>
                   <div>
                     <label htmlFor="category_id" style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('products.category')}</label>
                     <LOVSelect
@@ -811,7 +835,7 @@ if (
                 </div>
 
                 {/* Row 3: Prices & Min Stock */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '12px' }}>
                   <div>
                     <label htmlFor="purchase_price" style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>Cost</label>
                     <input
@@ -867,7 +891,7 @@ if (
                     <h5 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--color-primary)' }}>{t('products.initialStock')}</h5>
                     
                     {/* Row 4: Dates */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '12px', marginBottom: '12px' }}>
                       <div className="form-group" style={{ margin: 0 }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 500, marginBottom: '4px' }}>
                           📅 Production Date
@@ -895,7 +919,7 @@ if (
                     </div>
 
                     {/* Row 5: Batch info */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '12px' }}>
                       <div className="form-group" style={{ margin: 0 }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: 500, marginBottom: '4px', display: 'block' }}>{t('products.warehouse')}</label>
                         <select

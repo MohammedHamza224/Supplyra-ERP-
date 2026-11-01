@@ -276,7 +276,8 @@ const ProductSuppliers: React.FC<ProductSuppliersProps> = ({ productId }) => {
       )}
 
       {productSuppliers.length > 0 ? (
-        <table className="table" style={{ width: '100%', fontSize: '0.875rem' }}>
+        <div className="table-responsive">
+          <table className="table" style={{ width: '100%', fontSize: '0.875rem' }}>
           <thead>
             <tr>
               <th style={{ padding: '8px' }}>{t('product_suppliers.supplier')}</th>
@@ -321,6 +322,7 @@ const ProductSuppliers: React.FC<ProductSuppliersProps> = ({ productId }) => {
             ))}
           </tbody>
         </table>
+        </div>
       ) : (
         <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
           {t('product_suppliers.noSuppliers')}

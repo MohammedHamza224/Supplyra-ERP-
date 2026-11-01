@@ -599,7 +599,7 @@ export default function AnalyticsDashboard() {
       </div>
 
       {/* Section 1: Executive KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem', width: '100%' }}>
         
         {/* Sales KPI */}
         <div className="card" style={{ padding: '1.25rem' }}>
@@ -668,7 +668,7 @@ export default function AnalyticsDashboard() {
             <Award size={18} color="var(--color-primary)" />
             {isRtl ? 'رؤى وتوصيات الأعمال' : 'Actionable Business Insights'}
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '1rem', width: '100%' }}>
             {insights.map((insight, idx) => (
               <div 
                 key={idx} 
@@ -733,7 +733,7 @@ export default function AnalyticsDashboard() {
       </div>
 
       {/* Section 3: Performance Rankings Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.25rem', width: '100%' }}>
         
         {/* Top Products */}
         <div className="card" style={{ padding: '1.25rem' }}>
@@ -825,7 +825,7 @@ export default function AnalyticsDashboard() {
       </div>
 
       {/* Section 4: Inventory & Expiry Risk Assessment */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.25rem', width: '100%' }}>
         
         {/* Low Stock Alerts */}
         <div className="card" style={{ padding: '1.25rem' }}>

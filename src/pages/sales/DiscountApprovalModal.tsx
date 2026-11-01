@@ -212,7 +212,7 @@ const DiscountApprovalModal: React.FC<DiscountApprovalModalProps> = ({ orderId, 
           ) : approvalData ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', backgroundColor: 'var(--color-background)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '12px', backgroundColor: 'var(--color-background)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                 <div>
                   <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '2px' }}>{t('sales.orderNumber') || 'Order Number'}</span>
                   <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{approvalData.order.order_number}</span>
@@ -231,7 +231,7 @@ const DiscountApprovalModal: React.FC<DiscountApprovalModalProps> = ({ orderId, 
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', backgroundColor: 'rgba(245, 158, 11, 0.12)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid #fcd34d' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))', gap: '10px', backgroundColor: 'rgba(245, 158, 11, 0.12)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid #fcd34d' }}>
                 <div>
                   <span style={{ display: 'block', fontSize: '0.75rem', color: '#92400e', marginBottom: '2px' }}>{t('sales.subtotal') || 'Subtotal'}</span>
                   <span style={{ fontWeight: 700, color: '#b45309', fontSize: '1rem' }}>{Number(approvalData.order.subtotal || 0).toLocaleString()} {t('products.currency')}</span>
@@ -286,7 +286,7 @@ const DiscountApprovalModal: React.FC<DiscountApprovalModalProps> = ({ orderId, 
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '10px', backgroundColor: 'var(--color-background)', borderBottomLeftRadius: 'var(--radius-lg)', borderBottomRightRadius: 'var(--radius-lg)' }}>
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap', backgroundColor: 'var(--color-background)', borderBottomLeftRadius: 'var(--radius-lg)', borderBottomRightRadius: 'var(--radius-lg)' }}>
           {actionType ? (
              <>
                <button

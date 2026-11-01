@@ -59,17 +59,19 @@ const ResetPassword = () => {
       display: 'flex',
       minHeight: '100vh',
       backgroundColor: 'var(--color-background)',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      padding: 'clamp(16px, 4vw, 32px)'
     }}>
       <div style={{
         margin: 'auto',
         width: '100%',
         maxWidth: '400px',
-        padding: '40px',
+        padding: 'clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)',
         backgroundColor: 'var(--color-surface)',
         borderRadius: '12px',
         boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
-        textAlign: isRtl ? 'right' : 'left'
+        textAlign: isRtl ? 'right' : 'left',
+        boxSizing: 'border-box'
       }}>
         <h2 style={{ color: 'var(--color-text-primary)', margin: '0 0 8px 0', fontSize: '24px' }}>{t('resetPassword.title')}</h2>
         <p style={{ color: 'var(--color-text-secondary)', margin: '0 0 24px 0', fontSize: '14px' }}>{t('resetPassword.subtitle')}</p>

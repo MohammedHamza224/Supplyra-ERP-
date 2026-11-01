@@ -128,27 +128,27 @@ const Login = () => {
       }} />
 
       {/* Main Container */}
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'center', justifyContent: 'center', padding: 'clamp(16px, 4vw, 32px)' }}>
         
         {/* Top Branding */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'clamp(24px, 5vw, 40px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: 'fit-content', margin: '0 auto' }}>
             <div style={{ position: 'absolute', top: '-24px', left: '50%', transform: 'translateX(-50%)' }}>
                <svg width="40" height="40" viewBox="0 0 24 24" fill="var(--color-primary)" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 22C12 22 20 18 20 12C20 6 12 2 12 2C12 2 4 6 4 12C4 18 12 22 12 22Z" />
               </svg>
             </div>
-            <h1 style={{ fontSize: '3.8rem', fontWeight: 800, color: 'white', margin: 0, letterSpacing: '1px', textShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+            <h1 style={{ fontSize: 'clamp(2.5rem, 8vw, 3.8rem)', fontWeight: 800, color: 'white', margin: 0, letterSpacing: '1px', textShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
               SUPPLY<span style={{ color: 'var(--color-primary)' }}>RA</span>
             </h1>
           </div>
-          <p style={{ color: 'var(--color-border)', fontSize: '1.15rem', fontWeight: 500, margin: '12px 0 0 0', letterSpacing: '0.5px', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+          <p style={{ color: 'var(--color-border)', fontSize: 'clamp(0.95rem, 3vw, 1.15rem)', fontWeight: 500, margin: '10px 0 0 0', letterSpacing: '0.5px', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
             {t('login.brandTagline')}
           </p>
         </div>
 
         {/* Premium Login Card */}
-        <div style={{ width: '100%', maxWidth: '440px', backgroundColor: 'var(--color-surface)', borderRadius: '12px', padding: '40px 32px', boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.4)', direction: isRtl ? 'rtl' : 'ltr', boxSizing: 'border-box' }}>
+        <div style={{ width: '100%', maxWidth: '440px', backgroundColor: 'var(--color-surface)', borderRadius: '12px', padding: 'clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)', boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.4)', direction: isRtl ? 'rtl' : 'ltr', boxSizing: 'border-box' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
             <div>

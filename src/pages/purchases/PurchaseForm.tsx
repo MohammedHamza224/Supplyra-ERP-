@@ -347,17 +347,17 @@ const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchaseId, onClose, onSave
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
               {items.map((item, index) => (
-                <div key={item.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', backgroundColor: 'var(--color-background)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                <div key={item.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap', backgroundColor: 'var(--color-background)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                   
                   {/* Item Left block - main details */}
-                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px' }}>
-                      <div>
+                  <div style={{ flex: '1 1 280px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '10px' }}>
+                      <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, marginBottom: '4px' }}>{t('purchases.product')} *</label>
                         <select
                           required
                           value={item.product_id}
                           onChange={e => handleItemChange(index, 'product_id', e.target.value)}
-                          style={{ width: '100%', padding: '6px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', outline: 'none', fontSize: '0.85rem', backgroundColor: 'var(--color-background)' }}
+                          style={{ width: '100%', padding: '6px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', outline: 'none', fontSize: '0.85rem', backgroundColor: 'var(--color-surface)' }}
                         >
                           <option value="">{t('products.selectProduct') || 'Select Product'}</option>
                           {products.map(p => <option key={p.id} value={p.id}>{p.name} {p.product_code ? `(${p.product_code})` : ''}</option>)}
@@ -387,14 +387,17 @@ const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchaseId, onClose, onSave
                     </div>
                   </div>
 
-                  <div style={{ width: '90px', textAlign: 'right' }}>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, marginBottom: '4px' }}>{t('purchases.total')}</label>
-                    <div style={{ padding: '6px 0', fontWeight: 600, fontSize: '0.9rem' }}>{Number(item.total).toLocaleString()}</div>
-                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', borderTop: '1px solid var(--color-border)', paddingTop: '8px', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--color-text-secondary)' }}>{t('purchases.total')}:</span>
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-primary)' }}>{Number(item.total).toLocaleString()} {t('products.currency')}</span>
+                    </div>
 
-                  <button type="button" onClick={() => removeItem(index)} disabled={items.length === 1} style={{ marginTop: '20px', padding: '6px', background: 'none', border: 'none', color: items.length === 1 ? '#ccc' : '#ef4444', cursor: items.length === 1 ? 'not-allowed' : 'pointer' }}>
-                    <Trash2 size={18} />
-                  </button>
+                    <button type="button" onClick={() => removeItem(index)} disabled={items.length === 1} style={{ padding: '6px 10px', background: 'rgba(239, 68, 68, 0.1)', border: 'none', borderRadius: 'var(--radius-sm)', color: items.length === 1 ? '#ccc' : '#ef4444', cursor: items.length === 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
+                      <Trash2 size={16} />
+                      <span>{t('common.delete') || 'Delete'}</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -407,7 +410,7 @@ const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchaseId, onClose, onSave
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-background)' }}>
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-background)', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>
             {t('purchases.grandTotal')}: <span style={{ color: 'var(--color-primary)' }}>{calculateGrandTotal().toLocaleString()} {t('products.currency')}</span>
           </div>

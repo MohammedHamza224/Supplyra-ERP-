@@ -675,7 +675,7 @@ const Dashboard = () => {
       </div>
 
       {/* Business Analytics Row: Inventory Analytics & Customer Analytics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1rem', marginTop: '0.5rem', width: '100%' }}>
         
         {/* Inventory Analytics */}
         <div className={styles.cardSection}>
@@ -685,8 +685,8 @@ const Dashboard = () => {
               {language === 'ar' ? 'تحليلات المخزون والصلاحية' : 'Inventory & Stock Analytics'}
             </h2>
           </div>
-          <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ padding: '0.75rem 0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '12px' }}>
               <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{language === 'ar' ? 'دفعة منتهية الصلاحية' : 'Expired Batches'}</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 700, color: stats.expiredBatches > 0 ? (isDark ? '#f87171' : '#dc2626') : (isDark ? '#ffffff' : 'var(--color-text-primary)'), marginTop: '4px' }}>
@@ -700,7 +700,7 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.08)', border: isDark ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(59, 130, 246, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.08)', border: isDark ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(59, 130, 246, 0.2)', flexWrap: 'wrap', gap: '8px' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 500, color: isDark ? '#f8fafc' : 'inherit' }}>{language === 'ar' ? 'المنتجات المسجلة بالمخزن' : 'Registered Products in Inventory'}</span>
               <span style={{ fontWeight: 700, color: isDark ? '#60a5fa' : '#2563eb' }}>{stats.productsCount}</span>
             </div>
@@ -715,8 +715,8 @@ const Dashboard = () => {
               {language === 'ar' ? 'تحليلات العملاء والمستحقات' : 'Customer & Receivables Analytics'}
             </h2>
           </div>
-          <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ padding: '0.75rem 0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '12px' }}>
               <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{language === 'ar' ? 'إجمالي العملاء' : 'Total Active Customers'}</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 700, color: isDark ? '#34d399' : '#10b981', marginTop: '4px' }}>
@@ -730,7 +730,7 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', backgroundColor: isDark ? 'rgba(139, 92, 246, 0.12)' : 'rgba(139, 92, 246, 0.08)', border: isDark ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid rgba(139, 92, 246, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', backgroundColor: isDark ? 'rgba(139, 92, 246, 0.12)' : 'rgba(139, 92, 246, 0.08)', border: isDark ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid rgba(139, 92, 246, 0.2)', flexWrap: 'wrap', gap: '8px' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 500, color: isDark ? '#f8fafc' : 'inherit' }}>{language === 'ar' ? 'معدل الطلب للعميل' : 'Orders per Active Customer'}</span>
               <span style={{ fontWeight: 700, color: isDark ? '#a78bfa' : '#7c3aed' }}>
                 {stats.customersCount > 0 ? (stats.totalOrders / stats.customersCount).toFixed(1) : 0}

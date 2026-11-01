@@ -121,7 +121,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, roles, onClose, onSuccess }) 
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: '14px', marginBottom: '16px' }}>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
                 {isRtl ? 'الاسم الأول' : 'First Name'}

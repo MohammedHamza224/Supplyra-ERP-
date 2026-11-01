@@ -163,7 +163,8 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
           </div>
 
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '16px' }}>{t('purchases.items')}</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '24px' }}>
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '16px' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--color-background)', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ padding: '12px', fontSize: '0.85rem' }}>{t('purchases.product')}</th>
@@ -199,6 +200,7 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
               ))}
             </tbody>
           </table>
+          </div>
           
           {purchase.notes && (
             <div>
@@ -208,7 +210,7 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
           )}
         </div>
 
-        <div style={{ padding: '20px 24px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-background)' }}>
+        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-background)', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
             {t('purchases.grandTotal')}: <span style={{ color: 'var(--color-primary)' }}>{Number(purchase.grand_total).toLocaleString()} {t('products.currency')}</span>
           </div>

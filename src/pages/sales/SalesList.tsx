@@ -299,7 +299,7 @@ const SalesList = () => {
             )}
 
             <div style={{ padding: 'var(--spacing-4)', borderBottom: '1px solid var(--color-border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 12px', width: '300px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 12px', width: '100%', maxWidth: '300px' }}>
                 <Search size={16} color="var(--color-text-muted)" />
                 <input 
                   type="text" 

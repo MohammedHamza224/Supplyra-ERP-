@@ -36,6 +36,13 @@ export default function Settings() {
 
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 900);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     checkDb();
@@ -214,12 +221,25 @@ export default function Settings() {
   const fullName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Unknown';
 
   return (
-    <div className="page-container" style={{ display: 'flex', gap: '24px', maxWidth: '1400px', margin: '0 auto', minHeight: 'calc(100vh - 120px)' }}>
-      {/* Sidebar */}
-      <div style={{ width: '280px', backgroundColor: 'var(--color-surface)', borderRadius: '12px', padding: '24px', border: '1px solid var(--color-border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <h3 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', color: 'var(--color-text-primary)' }}>
-          {isRtl ? 'الإعدادات' : 'Settings'}
-        </h3>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '16px' : '24px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+      {/* Settings Navigation Tabs */}
+      <div style={{ 
+        width: isMobile ? '100%' : '260px', 
+        backgroundColor: 'var(--color-surface)', 
+        borderRadius: '12px', 
+        padding: isMobile ? '10px' : '20px', 
+        border: '1px solid var(--color-border)', 
+        flexShrink: 0, 
+        display: 'flex', 
+        flexDirection: isMobile ? 'row' : 'column', 
+        overflowX: isMobile ? 'auto' : 'visible',
+        gap: '6px' 
+      }}>
+        {!isMobile && (
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', color: 'var(--color-text-primary)' }}>
+            {isRtl ? 'الإعدادات' : 'Settings'}
+          </h3>
+        )}
         
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
@@ -228,21 +248,26 @@ export default function Settings() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '12px 16px', borderRadius: '8px',
+                display: 'flex', alignItems: 'center', gap: '8px', 
+                width: isMobile ? 'auto' : '100%', 
+                whiteSpace: 'nowrap',
+                padding: '10px 14px', borderRadius: '8px',
                 border: 'none', background: isActive ? 'var(--color-surface-hover)' : 'transparent',
                 color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                fontWeight: isActive ? 600 : 500, cursor: 'pointer', textAlign: isRtl ? 'right' : 'left', transition: 'all 0.2s ease'
+                fontWeight: isActive ? 600 : 500, cursor: 'pointer', textAlign: isRtl ? 'right' : 'left', transition: 'all 0.2s ease',
+                minHeight: '42px',
+                flexShrink: 0
               }}
             >
-              <tab.icon size={20} />
-              <span style={{ fontSize: '1rem' }}>{tab.label}</span>
+              <tab.icon size={18} />
+              <span style={{ fontSize: '0.9rem' }}>{tab.label}</span>
             </button>
           );
         })}
       </div>
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, backgroundColor: 'var(--color-surface)', borderRadius: '12px', padding: '32px', border: '1px solid var(--color-border)', overflowY: 'auto' }}>
+      <div style={{ flex: 1, backgroundColor: 'var(--color-surface)', borderRadius: '12px', padding: isMobile ? '16px' : '28px', border: '1px solid var(--color-border)', width: '100%', minWidth: 0, overflowY: 'auto' }}>
         <div style={{ maxWidth: '100%' }}>
           
           {/* ACCOUNT SETTINGS */}
@@ -258,7 +283,7 @@ export default function Settings() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '16px', marginTop: '24px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
                     {isRtl ? 'الدور الحالي' : 'Current Role'}
@@ -384,7 +409,7 @@ export default function Settings() {
                   {isRtl ? 'هوية ومعلومات Suppliera' : 'Suppliera Identity & Information'}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '16px' }}>
                   <div>
                     <label className="form-label">{isRtl ? 'اسم النظام' : 'System Name'} *</label>
                     <input 
@@ -436,7 +461,7 @@ export default function Settings() {
                   {isRtl ? 'تكوين القيمة المضافة والعملة' : 'VAT & Currency Configuration'}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '16px' }}>
                   <div>
                     <label className="form-label">{isRtl ? 'نسبة الضريبة المضافة (%)' : 'VAT Rate (%)'}</label>
                     <input 
