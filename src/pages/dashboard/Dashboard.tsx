@@ -1,20 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
-  Package, Users, Factory, MapPin, PlusCircle, Calendar, RefreshCw, 
-  AlertTriangle, Printer, FileText, Download, Banknote, ShoppingBag,
-  TrendingUp, TrendingDown, Clock, FileWarning, ArrowUp, ArrowDown, Minus, CheckCircle,
-  DollarSign, ShoppingCart, BarChart3, Layers, Filter
+  Package, Users, Factory, MapPin, Calendar, RefreshCw, 
+  Printer, FileText, Banknote, ShoppingBag,
+  TrendingUp, TrendingDown, Clock, ArrowUp, ArrowDown, Minus, CheckCircle,
+  DollarSign, BarChart3, Layers, Filter, Search, X, RotateCcw, Eye, ChevronLeft, ChevronRight, ExternalLink
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useDebounce } from '../../hooks/useDebounce';
+import SaleDetails from '../sales/SaleDetails';
 import styles from './Dashboard.module.css';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell
 } from 'recharts';
+
+export type DashboardDateFilter = 
+  | 'today' 
+  | 'yesterday' 
+  | '7days' 
+  | '30days' 
+  | 'thisMonth' 
+  | 'lastMonth' 
+  | 'thisYear' 
+  | 'custom' 
+  | 'all';
 
 interface DashboardStats {
   totalSales: number;
@@ -45,19 +58,31 @@ interface DashboardStats {
 
 const Dashboard = () => {
   const { t, language } = useTranslation();
+  const isRtl = language === 'ar';
   const { profile, user } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const navigate = useNavigate();
   const displayName = profile?.first_name ? `${profile.first_name}${profile.last_name ? ` ${profile.last_name}` : ''}` : user?.email?.split('@')[0] || 'User';
   
-  const [filter, setFilter] = useState<'30days' | 'today' | 'yesterday' | '7days' | 'thisMonth' | 'custom' | 'all'>('30days');
+  // Controls & Filter States
+  const [filter, setFilter] = useState<DashboardDateFilter>('30days');
   const [customFrom, setCustomFrom] = useState<string>(() => {
     const d = new Date();
     d.setDate(1);
     return d.toISOString().split('T')[0];
   });
   const [customTo, setCustomTo] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 300);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'PAID' | 'UNPAID' | 'DRAFT'>('all');
+  
+  // Raw Data & Table Pagination States
+  const [rawOrders, setRawOrders] = useState<any[]>([]);
+  const [tablePage, setTablePage] = useState(1);
+  const pageSize = 7;
+  const [viewingSaleId, setViewingSaleId] = useState<string | null>(null);
 
   const [stats, setStats] = useState<DashboardStats>({
     totalSales: 0,
@@ -92,6 +117,21 @@ const Dashboard = () => {
     return language === 'ar' ? `${dayName}، ${day}-${month}-${year}` : `${dayName}, ${day}-${month}-${year}`;
   };
 
+  const getDateFilterLabel = (f: DashboardDateFilter) => {
+    switch (f) {
+      case 'today': return isRtl ? 'اليوم' : 'Today';
+      case 'yesterday': return isRtl ? 'الأمس' : 'Yesterday';
+      case '7days': return isRtl ? 'آخر 7 أيام' : 'Last 7 Days';
+      case '30days': return isRtl ? 'آخر 30 يوم' : 'Last 30 Days';
+      case 'thisMonth': return isRtl ? 'هذا الشهر' : 'This Month';
+      case 'lastMonth': return isRtl ? 'الشهر السابق' : 'Last Month';
+      case 'thisYear': return isRtl ? 'هذا العام' : 'This Year';
+      case 'custom': return isRtl ? 'فترة مخصصة' : 'Custom Range';
+      case 'all': return isRtl ? 'كافة الفترات' : 'All Time';
+      default: return f;
+    }
+  };
+
   const fetchStats = async () => {
     setLoading(true);
     try {
@@ -101,15 +141,21 @@ const Dashboard = () => {
       
       if (filter === 'today') {
         const d = new Date(now); d.setHours(0,0,0,0); fromDateStr = d.toISOString();
+        const dEnd = new Date(now); dEnd.setHours(23,59,59,999); toDateStr = dEnd.toISOString();
       } else if (filter === 'yesterday') {
         const d = new Date(now); d.setDate(d.getDate() - 1); d.setHours(0,0,0,0); fromDateStr = d.toISOString();
         const dEnd = new Date(now); dEnd.setDate(dEnd.getDate() - 1); dEnd.setHours(23,59,59,999); toDateStr = dEnd.toISOString();
       } else if (filter === '7days') {
-        const d = new Date(now); d.setDate(d.getDate() - 7); fromDateStr = d.toISOString();
+        const d = new Date(now); d.setDate(d.getDate() - 7); d.setHours(0,0,0,0); fromDateStr = d.toISOString();
       } else if (filter === '30days') {
-        const d = new Date(now); d.setDate(d.getDate() - 30); fromDateStr = d.toISOString();
+        const d = new Date(now); d.setDate(d.getDate() - 30); d.setHours(0,0,0,0); fromDateStr = d.toISOString();
       } else if (filter === 'thisMonth') {
-        const d = new Date(now.getFullYear(), now.getMonth(), 1); fromDateStr = d.toISOString();
+        const d = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0); fromDateStr = d.toISOString();
+      } else if (filter === 'lastMonth') {
+        const dFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0); fromDateStr = dFrom.toISOString();
+        const dTo = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999); toDateStr = dTo.toISOString();
+      } else if (filter === 'thisYear') {
+        const d = new Date(now.getFullYear(), 0, 1, 0, 0, 0); fromDateStr = d.toISOString();
       } else if (filter === 'custom') {
         if (customFrom) {
           const dFrom = new Date(customFrom); dFrom.setHours(0,0,0,0); fromDateStr = dFrom.toISOString();
@@ -119,7 +165,7 @@ const Dashboard = () => {
         }
       }
 
-      // Base queries for counts
+      // Base queries for master counts
       const [
         { count: pCount },
         { count: cCount },
@@ -132,15 +178,32 @@ const Dashboard = () => {
         supabase.from('warehouses').select('*', { count: 'exact', head: true }).eq('active', true)
       ]);
 
-      // 1. Sales / Orders Query
+      // 1. Sales / Orders Query (Filtered by Date Range)
       let ordersQuery = supabase
         .from('orders')
-        .select('id, order_number, total_amount, created_at, status, payment_status, customer:customers(name)')
+        .select(`
+          id, 
+          order_number, 
+          total_amount, 
+          grand_total,
+          tax,
+          discount,
+          created_at, 
+          status, 
+          payment_status, 
+          customer_id,
+          customer:customers(name, phone)
+        `)
         .neq('status', 'cancelled')
-        .neq('status', 'CANCELLED');
+        .neq('status', 'CANCELLED')
+        .order('created_at', { ascending: false });
+
       if (fromDateStr) ordersQuery = ordersQuery.gte('created_at', fromDateStr);
       if (toDateStr) ordersQuery = ordersQuery.lte('created_at', toDateStr);
       const { data: orders } = await ordersQuery;
+
+      setRawOrders(orders || []);
+      setTablePage(1);
 
       let totalSales = 0;
       let totalOrders = 0;
@@ -149,7 +212,7 @@ const Dashboard = () => {
       if (orders) {
         totalOrders = orders.length;
         orders.forEach(o => {
-          const val = Number((o as any).total_amount || (o as any).grand_total || 0);
+          const val = Number((o as any).grand_total ?? (o as any).total_amount ?? 0);
           totalSales += val;
           const dateKey = new Date(o.created_at).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' });
           salesByDate[dateKey] = (salesByDate[dateKey] || 0) + val;
@@ -171,7 +234,7 @@ const Dashboard = () => {
         else if (secondHalf < firstHalf * 0.95) trendStatus = 'decreasing';
       }
 
-      // 2. Purchases Query
+      // 2. Purchases Query (Filtered by Date Range)
       const { data: rawPurchases } = await supabase
         .from('purchases')
         .select('*')
@@ -202,7 +265,7 @@ const Dashboard = () => {
         return true;
       });
 
-      const totalPurchases = purchases.reduce((sum, p) => sum + Number((p as any).total_amount ?? (p as any).grand_total ?? (p as any).total ?? (p as any).subtotal ?? 0), 0);
+      const totalPurchases = purchases.reduce((sum, p) => sum + Number((p as any).grand_total ?? (p as any).total_amount ?? (p as any).total ?? (p as any).subtotal ?? 0), 0);
 
       // 3. Order Items (COGS, Top Products & Total Quantity Sold)
       let orderItemsQuery = supabase.from('order_items').select('quantity, subtotal, product:products(name, purchase_price)');
@@ -326,6 +389,49 @@ const Dashboard = () => {
     fetchStats();
   }, [filter]);
 
+  // Real-time In-memory Filtered Orders for the Analysis Table
+  const filteredOrders = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    return rawOrders.filter(o => {
+      // 1. Search filter across order_number, customer name, phone, and amount
+      const matchesSearch = !q ||
+        (o.order_number && o.order_number.toLowerCase().includes(q)) ||
+        (o.customer?.name && o.customer.name.toLowerCase().includes(q)) ||
+        (o.customer?.phone && o.customer.phone.includes(q)) ||
+        (String(o.grand_total || o.total_amount || '').includes(q));
+
+      // 2. Status filter
+      let matchesStatus = true;
+      if (statusFilter === 'PAID') {
+        matchesStatus = (o.payment_status || '').toUpperCase() === 'PAID';
+      } else if (statusFilter === 'UNPAID') {
+        const ps = (o.payment_status || '').toUpperCase();
+        matchesStatus = ps === 'UNPAID' || ps === 'PARTIALLY_PAID';
+      } else if (statusFilter === 'DRAFT') {
+        matchesStatus = (o.status || '').toUpperCase() === 'DRAFT';
+      }
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [rawOrders, debouncedSearch, statusFilter]);
+
+  // Reset pagination on filter or search changes
+  useEffect(() => {
+    setTablePage(1);
+  }, [debouncedSearch, statusFilter, filter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const paginatedOrders = useMemo(() => {
+    return filteredOrders.slice((tablePage - 1) * pageSize, tablePage * pageSize);
+  }, [filteredOrders, tablePage]);
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setFilter('30days');
+    setTablePage(1);
+  };
+
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat(language === 'ar' ? 'ar-SA' : 'en-US', {
       style: 'currency',
@@ -336,129 +442,48 @@ const Dashboard = () => {
 
   return (
     <div className={styles.container}>
-      {/* Header Bar */}
+      
+      {/* 1. Header Bar: Welcome, Date, Subtitle & Executive Actions */}
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>
             {language === 'ar' ? `مرحباً، ${displayName}` : `Welcome back, ${displayName}`} 👋
           </h1>
-          {/* Dynamic Date directly under welcome message */}
-          <div style={{ fontSize: '0.9rem', color: 'var(--color-primary)', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '0.875rem', color: 'var(--color-primary)', fontWeight: 600, marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Calendar size={15} />
             {getTodayFormatted()}
           </div>
           <p className={styles.subtitle} style={{ marginTop: '4px' }}>
-            {language === 'ar' ? 'إليك نظرة عامة على نشاط النظام والأداء اليومي' : 'Here is your system overview and daily performance'}
+            {language === 'ar' ? 'لوحة التحكم التنفيذية — نظرة عامة شاملة على أداء المبيعات والمخزون والعمليات' : 'Executive Dashboard — Comprehensive overview of sales, inventory and operational performance'}
           </p>
         </div>
 
-        {/* Upper-Left / Controls Area with Compact Business Summary & Date Filters */}
-        <div className={styles.controls} style={{ flexWrap: 'wrap', gap: '12px' }}>
-          {/* Period Performance Summary Box */}
-          <div className={styles.periodSummaryBox}>
-            <div className={styles.periodSummaryHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <TrendingUp size={16} color="var(--color-primary)" style={{ flexShrink: 0 }} />
-                <span className={styles.periodSummaryTitle}>
-                  {language === 'ar' ? 'ملخص أداء الفترة' : 'Period Performance Summary'}
-                </span>
-              </div>
-              <span className={styles.periodSummaryBadge}>
-                {filter === '30days' ? (language === 'ar' ? 'آخر 30 يوم' : 'Last 30 Days') :
-                 filter === '7days' ? (language === 'ar' ? 'آخر 7 أيام' : 'Last 7 Days') :
-                 filter === 'thisMonth' ? (language === 'ar' ? 'هذا الشهر' : 'This Month') :
-                 filter === 'today' ? (language === 'ar' ? 'اليوم' : 'Today') :
-                 filter === 'yesterday' ? (language === 'ar' ? 'الأمس' : 'Yesterday') :
-                 filter === 'custom' ? (language === 'ar' ? 'فترة مخصصة' : 'Custom') :
-                 (language === 'ar' ? 'الكل' : 'All Time')}
-              </span>
-            </div>
-
-            <div className={styles.periodSummaryGrid}>
-              {/* Sales Chip */}
-              <div className={styles.periodChip}>
-                <span className={styles.periodChipLabel}>
-                  {language === 'ar' ? 'المبيعات' : 'Sales'}
-                </span>
-                <span className={styles.periodChipValueSales}>
-                  {formatCurrency(stats.totalSales)}
-                </span>
-              </div>
-
-              {/* Purchases Chip */}
-              <div className={styles.periodChip}>
-                <span className={styles.periodChipLabel}>
-                  {language === 'ar' ? 'المشتريات' : 'Purchases'}
-                </span>
-                <span className={styles.periodChipValuePurchases}>
-                  {formatCurrency(stats.totalPurchases)}
-                </span>
-              </div>
-
-              {/* Profit Chip */}
-              <div className={styles.periodChip}>
-                <span className={styles.periodChipLabel}>
-                  {language === 'ar' ? 'صافي الأرباح' : 'Gross Profit'}
-                </span>
-                <span className={stats.grossProfit >= 0 ? styles.periodChipValueProfitPos : styles.periodChipValueProfitNeg}>
-                  {formatCurrency(stats.grossProfit)}
-                </span>
-              </div>
-
-              {/* Orders Chip */}
-              <div className={styles.periodChip}>
-                <span className={styles.periodChipLabel}>
-                  {language === 'ar' ? 'عدد الطلبات' : 'Orders'}
-                </span>
-                <span className={styles.periodChipValueOrders}>
-                  {stats.totalOrders} {language === 'ar' ? 'طلب' : 'orders'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Date Filters */}
-          <div className={styles.filterGroup}>
-            <Calendar size={16} color="var(--color-text-secondary)" />
-            <select 
-              value={filter} 
-              onChange={(e: any) => setFilter(e.target.value)}
-              className={styles.filterSelect}
-            >
-              <option value="today">{language === 'ar' ? 'اليوم' : 'Today'}</option>
-              <option value="yesterday">{language === 'ar' ? 'الأمس' : 'Yesterday'}</option>
-              <option value="7days">{language === 'ar' ? 'آخر 7 أيام' : 'Last 7 Days'}</option>
-              <option value="30days">{language === 'ar' ? 'آخر 30 يوم' : 'Last 30 Days'}</option>
-              <option value="thisMonth">{language === 'ar' ? 'هذا الشهر' : 'This Month'}</option>
-              <option value="custom">{language === 'ar' ? 'فترة مخصصة' : 'Custom Range'}</option>
-              <option value="all">{language === 'ar' ? 'الكل' : 'All Time'}</option>
-            </select>
-          </div>
-
-          {/* Custom Date Range Picker */}
-          {filter === 'custom' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', backgroundColor: 'var(--color-surface)', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{language === 'ar' ? 'من:' : 'From:'}</span>
-                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="form-input" style={{ padding: '3px 6px', fontSize: '0.8rem' }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{language === 'ar' ? 'إلى:' : 'To:'}</span>
-                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="form-input" style={{ padding: '3px 6px', fontSize: '0.8rem' }} />
-              </div>
-              <button onClick={fetchStats} className="btn btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
-                {language === 'ar' ? 'تطبيق' : 'Apply'}
-              </button>
-            </div>
-          )}
-
-          <button className={styles.iconBtn} onClick={fetchStats} title="Refresh">
-            <RefreshCw size={18} className={loading ? styles.spinning : ''} />
+        {/* Quick Action Buttons */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            type="button"
+            className="btn btn-secondary" 
+            onClick={fetchStats}
+            title={language === 'ar' ? 'تحديث البيانات' : 'Refresh Data'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', minHeight: '38px', padding: '0 14px' }}
+          >
+            <RefreshCw size={15} className={loading ? styles.spinning : ''} />
+            <span>{language === 'ar' ? 'تحديث' : 'Refresh'}</span>
+          </button>
+          <button 
+            type="button"
+            className="btn btn-secondary" 
+            onClick={() => window.print()}
+            title={language === 'ar' ? 'طباعة ملخص اللوحة' : 'Print Summary'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', minHeight: '38px', padding: '0 14px' }}
+          >
+            <Printer size={15} />
+            <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* 2. KPI Cards Grid (10 Core Business Indicators) */}
       <div className={styles.kpiGrid}>
         
         {/* Card 1: Total Sales */}
@@ -469,7 +494,7 @@ const Dashboard = () => {
           <div className={styles.kpiInfo}>
             <span className={styles.kpiValue}>{loading ? '...' : formatCurrency(stats.totalSales)}</span>
             <span className={styles.kpiLabel}>{language === 'ar' ? 'إجمالي المبيعات' : 'Total Sales'}</span>
-            <span className={`${styles.kpiTrend} ${styles.positive}`}><ArrowUp size={12}/> {language === 'ar' ? 'عن الفترة السابقة' : 'vs previous period'}</span>
+            <span className={`${styles.kpiTrend} ${styles.positive}`}><ArrowUp size={12}/> {language === 'ar' ? 'عن الفترة المحددة' : 'vs selected period'}</span>
           </div>
         </div>
 
@@ -587,7 +612,485 @@ const Dashboard = () => {
 
       </div>
 
-      {/* Main Charts Row */}
+      {/* 3. Executive Analytics Section: Analysis Table + Side Controls Panel */}
+      <div className={styles.analyticsSection}>
+        
+        {/* Main Analysis Table Area (~70% width, positioned right in RTL) */}
+        <div className={styles.tableMainArea}>
+          <div className={styles.tableHeaderBar}>
+            <div className={styles.tableTitleArea}>
+              <FileText size={20} color="var(--color-primary)" />
+              <h2 className={styles.tableMainTitle}>
+                {language === 'ar' ? 'جدول تحليل العمليات والطلبات' : 'Executive Transactions Analysis'}
+              </h2>
+              <span className={styles.tableCountBadge}>
+                {filteredOrders.length} {language === 'ar' ? 'معاملة' : 'records'}
+              </span>
+            </div>
+
+            <Link to="/sales" className={styles.viewAllLink}>
+              <span>{language === 'ar' ? 'عرض كافة المبيعات' : 'View all sales'}</span>
+              {isRtl ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+            </Link>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="desktop-table-view table-responsive">
+            <table style={{ width: '100%', minWidth: '720px', borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
+              <thead style={{ backgroundColor: 'var(--color-background)', borderBottom: '2px solid var(--color-border)' }}>
+                <tr>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                    {language === 'ar' ? 'رقم المعاملة' : 'Order #'}
+                  </th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                    {language === 'ar' ? 'العميل' : 'Customer'}
+                  </th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                    {language === 'ar' ? 'التاريخ' : 'Date'}
+                  </th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>
+                    {language === 'ar' ? 'الإجمالي' : 'Amount'}
+                  </th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                    {language === 'ar' ? 'حالة الدفع' : 'Payment'}
+                  </th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                    {language === 'ar' ? 'الحالة' : 'Status'}
+                  </th>
+                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>
+                    {language === 'ar' ? 'معاينة' : 'Action'}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                      {language === 'ar' ? 'جاري تحميل العمليات...' : 'Loading transactions...'}
+                    </td>
+                  </tr>
+                ) : filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <Search size={32} style={{ opacity: 0.3 }} />
+                        <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                          {language === 'ar' ? 'لا توجد معاملات مطابقة لمعايير البحث أو الفترة المحددة' : 'No transactions found matching current filters'}
+                        </span>
+                        {(searchQuery || statusFilter !== 'all' || filter !== '30days') && (
+                          <button 
+                            type="button"
+                            onClick={handleResetFilters}
+                            className="btn btn-secondary"
+                            style={{ marginTop: '6px', fontSize: '0.8rem', padding: '4px 12px' }}
+                          >
+                            {language === 'ar' ? 'إعادة ضبط أدوات البحث والفلاتر' : 'Reset search and filters'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedOrders.map(order => {
+                    const amount = Number(order.grand_total ?? order.total_amount ?? 0);
+                    const isPaid = (order.payment_status || '').toUpperCase() === 'PAID';
+                    const isConfirmed = (order.status || '').toUpperCase() === 'CONFIRMED' || (order.status || '').toUpperCase() === 'DELIVERED';
+
+                    return (
+                      <tr key={order.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                          <span style={{ 
+                            fontSize: '0.78rem', 
+                            fontFamily: 'monospace', 
+                            backgroundColor: 'var(--color-background)', 
+                            border: '1px solid var(--color-border)', 
+                            padding: '3px 8px', 
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                            color: 'var(--color-primary)'
+                          }}>
+                            {order.order_number || '-'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                            {order.customer?.name || (language === 'ar' ? 'عميل نقدي' : 'Walk-in Customer')}
+                          </div>
+                          {order.customer?.phone && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                              {order.customer.phone}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 14px', fontSize: '0.8rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                          {new Date(order.created_at).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                            {formatCurrency(amount)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                          {isPaid ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 600, backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'rgb(16, 185, 129)' }}>
+                              <CheckCircle size={12} /> {language === 'ar' ? 'مدفوعة' : 'Paid'}
+                            </span>
+                          ) : (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 600, backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'rgb(217, 119, 6)' }}>
+                              <Clock size={12} /> {language === 'ar' ? 'بانتظار التحصيل' : 'Unpaid'}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                          <span style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            padding: '2px 8px', 
+                            borderRadius: '12px', 
+                            fontSize: '0.72rem', 
+                            fontWeight: 600, 
+                            backgroundColor: isConfirmed ? 'rgba(59, 130, 246, 0.1)' : 'var(--color-surface-hover)', 
+                            color: isConfirmed ? '#2563eb' : 'var(--color-text-secondary)', 
+                            border: '1px solid var(--color-border)' 
+                          }}>
+                            {isConfirmed ? (language === 'ar' ? 'مؤكدة' : 'Confirmed') : (order.status || '-')}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 14px', textAlign: isRtl ? 'left' : 'right', whiteSpace: 'nowrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => setViewingSaleId(order.id)}
+                            title={language === 'ar' ? 'عرض تفاصيل الفاتورة' : 'View invoice details'}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              backgroundColor: 'var(--color-surface)',
+                              color: 'var(--color-primary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <Eye size={15} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards View (< 768px) */}
+          <div className="mobile-cards-view" style={{ flexDirection: 'column', gap: '10px', padding: '12px' }}>
+            {filteredOrders.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--color-text-muted)' }}>
+                {language === 'ar' ? 'لا توجد معاملات مطابقة للبحث أو الفترة' : 'No matching transactions'}
+              </div>
+            ) : (
+              paginatedOrders.map(order => {
+                const amount = Number(order.grand_total ?? order.total_amount ?? 0);
+                const isPaid = (order.payment_status || '').toUpperCase() === 'PAID';
+
+                return (
+                  <div
+                    key={`mob-order-${order.id}`}
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                        {order.order_number}
+                      </span>
+                      {isPaid ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 7px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'rgb(16, 185, 129)' }}>
+                          <CheckCircle size={11} /> {language === 'ar' ? 'مدفوعة' : 'Paid'}
+                        </span>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 7px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'rgb(217, 119, 6)' }}>
+                          <Clock size={11} /> {language === 'ar' ? 'بانتظار التحصيل' : 'Unpaid'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                        {order.customer?.name || (language === 'ar' ? 'عميل نقدي' : 'Walk-in')}
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-primary)' }}>
+                        {formatCurrency(amount)}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--color-border)', paddingTop: '6px', fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+                      <span>{new Date(order.created_at).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US')}</span>
+                      <button 
+                        type="button" 
+                        onClick={() => setViewingSaleId(order.id)}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Eye size={13} /> {language === 'ar' ? 'معاينة' : 'View'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Pagination Footer */}
+          {filteredOrders.length > pageSize && (
+            <div className={styles.paginationContainer}>
+              <div>
+                <span>{language === 'ar' ? 'عرض' : 'Showing'} </span>
+                <strong>{(tablePage - 1) * pageSize + 1} - {Math.min(tablePage * pageSize, filteredOrders.length)}</strong>
+                <span> {language === 'ar' ? 'من أصل' : 'of'} </span>
+                <strong>{filteredOrders.length}</strong>
+              </div>
+
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setTablePage(p => Math.max(1, p - 1))}
+                  disabled={tablePage === 1}
+                  className={styles.paginationBtn}
+                >
+                  {isRtl ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+                  <span>{language === 'ar' ? 'السابق' : 'Prev'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTablePage(p => Math.min(totalPages, p + 1))}
+                  disabled={tablePage === totalPages}
+                  className={styles.paginationBtn}
+                >
+                  <span>{language === 'ar' ? 'التالي' : 'Next'}</span>
+                  {isRtl ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Side Controls Panel (~30% width, positioned left in RTL) */}
+        <div className={styles.controlsSidePanel}>
+          <div className={styles.panelHeader}>
+            <h3 className={styles.panelTitle}>
+              <Filter size={18} color="var(--color-primary)" />
+              <span>{language === 'ar' ? 'أدوات البحث والتحكم' : 'Analytics Controls'}</span>
+            </h3>
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className={styles.panelResetBtn}
+              title={language === 'ar' ? 'إعادة ضبط البحث والفلاتر' : 'Reset search and filters'}
+            >
+              <RotateCcw size={12} />
+              <span>{language === 'ar' ? 'إعادة ضبط' : 'Reset'}</span>
+            </button>
+          </div>
+
+          {/* 1. Search Box with Clear Button */}
+          <div className={styles.controlGroup}>
+            <label className={styles.controlLabel}>
+              <Search size={14} color="var(--color-primary)" />
+              <span>{language === 'ar' ? 'البحث السريع في العمليات' : 'Quick Search'}</span>
+            </label>
+            <div className={styles.searchBox}>
+              <Search 
+                size={16} 
+                style={{ 
+                  position: 'absolute', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  right: isRtl ? '12px' : 'auto', 
+                  left: isRtl ? 'auto' : '12px', 
+                  color: 'var(--color-text-muted)',
+                  pointerEvents: 'none'
+                }} 
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={language === 'ar' ? 'رقم الفاتورة، العميل، المبلغ...' : 'Order #, customer, amount...'}
+                className={styles.searchInput}
+                style={{
+                  paddingRight: isRtl ? '36px' : '32px',
+                  paddingLeft: isRtl ? '32px' : '36px'
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className={styles.clearSearchBtn}
+                  style={{ [isRtl ? 'left' : 'right']: '10px' }}
+                  title={language === 'ar' ? 'مسح البحث' : 'Clear search'}
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+            {debouncedSearch && (
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-primary)', fontWeight: 600, paddingInlineStart: '2px' }}>
+                {language === 'ar' ? `نتائج البحث: ${filteredOrders.length} معاملة مطابقة` : `Found ${filteredOrders.length} matching transactions`}
+              </div>
+            )}
+          </div>
+
+          {/* 2. Date Range Filter with All 8 Options */}
+          <div className={styles.controlGroup}>
+            <label className={styles.controlLabel}>
+              <Calendar size={14} color="var(--color-primary)" />
+              <span>{language === 'ar' ? 'اختيار الفترة الزمنية' : 'Date Range'}</span>
+            </label>
+            <select
+              value={filter}
+              onChange={(e: any) => setFilter(e.target.value)}
+              className={styles.statusFilterSelect}
+            >
+              <option value="today">{language === 'ar' ? 'اليوم' : 'Today'}</option>
+              <option value="yesterday">{language === 'ar' ? 'الأمس' : 'Yesterday'}</option>
+              <option value="7days">{language === 'ar' ? 'آخر 7 أيام' : 'Last 7 Days'}</option>
+              <option value="30days">{language === 'ar' ? 'آخر 30 يوماً' : 'Last 30 Days'}</option>
+              <option value="thisMonth">{language === 'ar' ? 'هذا الشهر' : 'This Month'}</option>
+              <option value="lastMonth">{language === 'ar' ? 'الشهر السابق' : 'Last Month'}</option>
+              <option value="thisYear">{language === 'ar' ? 'هذا العام' : 'This Year'}</option>
+              <option value="custom">{language === 'ar' ? 'فترة مخصصة (Custom Range)' : 'Custom Range'}</option>
+              <option value="all">{language === 'ar' ? 'كافة الفترات (All Time)' : 'All Time'}</option>
+            </select>
+          </div>
+
+          {/* Custom Date Range Pickers (Active when 'custom' is selected) */}
+          {filter === 'custom' && (
+            <div className={styles.customDateContainer}>
+              <div className={styles.customDateRow}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', width: '35px' }}>
+                  {language === 'ar' ? 'من:' : 'From:'}
+                </span>
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className={styles.customDateInput}
+                />
+              </div>
+              <div className={styles.customDateRow}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', width: '35px' }}>
+                  {language === 'ar' ? 'إلى:' : 'To:'}
+                </span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className={styles.customDateInput}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={fetchStats}
+                className={styles.applyDateBtn}
+              >
+                <CheckCircle size={14} />
+                <span>{language === 'ar' ? 'تطبيق الفترة' : 'Apply Range'}</span>
+              </button>
+            </div>
+          )}
+
+          {/* 3. Transaction Status Filter */}
+          <div className={styles.controlGroup}>
+            <label className={styles.controlLabel}>
+              <Banknote size={14} color="var(--color-primary)" />
+              <span>{language === 'ar' ? 'حالة الدفع والمعاملة' : 'Payment Status'}</span>
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e: any) => setStatusFilter(e.target.value)}
+              className={styles.statusFilterSelect}
+            >
+              <option value="all">{language === 'ar' ? 'كافة الحالات' : 'All Statuses'}</option>
+              <option value="PAID">{language === 'ar' ? 'مدفوعة بالكامل' : 'Paid in Full'}</option>
+              <option value="UNPAID">{language === 'ar' ? 'بانتظار التحصيل / آجل' : 'Unpaid / Partial'}</option>
+              <option value="DRAFT">{language === 'ar' ? 'مسودة' : 'Draft'}</option>
+            </select>
+          </div>
+
+          {/* 4. Compact Period Performance Summary Card */}
+          <div className={styles.periodSummaryBox} style={{ margin: 0 }}>
+            <div className={styles.periodSummaryHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <TrendingUp size={16} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+                <span className={styles.periodSummaryTitle}>
+                  {language === 'ar' ? 'ملخص أداء الفترة' : 'Period Summary'}
+                </span>
+              </div>
+              <span className={styles.periodSummaryBadge}>
+                {getDateFilterLabel(filter)}
+              </span>
+            </div>
+
+            <div className={styles.periodSummaryGrid}>
+              <div className={styles.periodChip}>
+                <span className={styles.periodChipLabel}>
+                  {language === 'ar' ? 'المبيعات' : 'Sales'}
+                </span>
+                <span className={styles.periodChipValueSales}>
+                  {formatCurrency(stats.totalSales)}
+                </span>
+              </div>
+
+              <div className={styles.periodChip}>
+                <span className={styles.periodChipLabel}>
+                  {language === 'ar' ? 'المشتريات' : 'Purchases'}
+                </span>
+                <span className={styles.periodChipValuePurchases}>
+                  {formatCurrency(stats.totalPurchases)}
+                </span>
+              </div>
+
+              <div className={styles.periodChip}>
+                <span className={styles.periodChipLabel}>
+                  {language === 'ar' ? 'صافي الأرباح' : 'Gross Profit'}
+                </span>
+                <span className={stats.grossProfit >= 0 ? styles.periodChipValueProfitPos : styles.periodChipValueProfitNeg}>
+                  {formatCurrency(stats.grossProfit)}
+                </span>
+              </div>
+
+              <div className={styles.periodChip}>
+                <span className={styles.periodChipLabel}>
+                  {language === 'ar' ? 'الطلبات' : 'Orders'}
+                </span>
+                <span className={styles.periodChipValueOrders}>
+                  {stats.totalOrders} {language === 'ar' ? 'طلب' : 'orders'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* 4. Main Charts Section (Synchronized with Date Filter) */}
       <div className={styles.chartsGrid}>
         
         {/* Sales Trend Line Chart */}
@@ -595,7 +1098,7 @@ const Dashboard = () => {
           <div className={styles.sectionHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 className={styles.sectionTitle} style={{ margin: 0 }}>
               <TrendingUp size={20} color="#10b981" />
-              {language === 'ar' ? 'مبيعات آخر فترة' : 'Sales Trend'}
+              <span>{language === 'ar' ? 'منحنى اتجاه المبيعات' : 'Sales Trend'}</span>
             </h2>
             {stats.salesTrend.length > 0 && (
               <span style={{ 
@@ -642,7 +1145,7 @@ const Dashboard = () => {
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>
               <TrendingUp size={20} color="#3b82f6" />
-              {language === 'ar' ? 'أكثر المنتجات مبيعاً' : 'Top Selling Products'}
+              <span>{language === 'ar' ? 'أكثر المنتجات طلباً ومبيعاً' : 'Top Selling Products'}</span>
             </h2>
           </div>
           <div className={styles.chartContainer}>
@@ -674,8 +1177,8 @@ const Dashboard = () => {
 
       </div>
 
-      {/* Business Analytics Row: Inventory Analytics & Customer Analytics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1rem', marginTop: '0.5rem', width: '100%' }}>
+      {/* 5. Business Analytics Row: Inventory Analytics & Customer Analytics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1rem', marginTop: '0.25rem', width: '100%' }}>
         
         {/* Inventory Analytics */}
         <div className={styles.cardSection}>
@@ -740,6 +1243,16 @@ const Dashboard = () => {
         </div>
 
       </div>
+
+      {/* Sale Details Modal (If clicked from table) */}
+      {viewingSaleId && (
+        <SaleDetails 
+          isOpen={Boolean(viewingSaleId)}
+          saleId={viewingSaleId} 
+          onClose={() => setViewingSaleId(null)} 
+          onUpdate={fetchStats} 
+        />
+      )}
 
     </div>
   );

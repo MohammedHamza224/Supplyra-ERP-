@@ -712,3 +712,330 @@ html[dir="ltr"] .recentActivityTable th {
 :global([data-theme='dark']) .emptyState {
   color: #94a3b8;
 }
+
+/* =========================================================================
+   EXECUTIVE ANALYTICS SECTION: TABLE & SIDE CONTROLS PANEL
+   ========================================================================= */
+
+.analyticsSection {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+  width: 100%;
+  margin-top: 4px;
+}
+
+@media (max-width: 1080px) {
+  .analyticsSection {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.tableMainArea {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.controlsSidePanel {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 12px;
+}
+
+.panelTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.panelResetBtn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.panelResetBtn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.controlGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.controlLabel {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.searchBox {
+  position: relative;
+  width: 100%;
+}
+
+.searchInput {
+  width: 100%;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.searchInput:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.clearSearchBtn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.clearSearchBtn:hover {
+  color: var(--color-text-primary);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.statusFilterSelect {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.statusFilterSelect:focus {
+  border-color: var(--color-primary);
+}
+
+.customDateContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-background);
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.customDateRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.customDateInput {
+  flex: 1;
+  height: 32px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.applyDateBtn {
+  width: 100%;
+  height: 34px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.applyDateBtn:hover {
+  background: var(--color-primary-dark);
+}
+
+.tableHeaderBar {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tableTitleArea {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tableMainTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.tableCountBadge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(13, 148, 136, 0.1);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.viewAllLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: gap 0.2s;
+}
+
+.viewAllLink:hover {
+  gap: 6px;
+}
+
+.paginationContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.paginationBtn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paginationBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.paginationBtn:not(:disabled):hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+:global([data-theme='dark']) .tableMainArea,
+:global([data-theme='dark']) .controlsSidePanel {
+  background: var(--color-surface);
+  border-color: rgba(51, 65, 85, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+:global([data-theme='dark']) .panelTitle,
+:global([data-theme='dark']) .tableMainTitle {
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .searchInput,
+:global([data-theme='dark']) .statusFilterSelect,
+:global([data-theme='dark']) .customDateContainer {
+  background: var(--color-background);
+  border-color: var(--color-border);
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .customDateInput {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: #f8fafc;
+}
+
+:global([data-theme='dark']) .tableHeaderBar,
+:global([data-theme='dark']) .paginationContainer {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
