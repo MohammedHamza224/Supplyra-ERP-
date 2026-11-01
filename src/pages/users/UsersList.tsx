@@ -206,7 +206,24 @@ const UsersList = () => {
       fullName.includes(q) ||
       (user.email && user.email.toLowerCase().includes(q));
     
-    const matchesRole = roleFilter ? user.role_id === roleFilter : true;
+    let matchesRole = true;
+    if (roleFilter) {
+      if (user.role_id === roleFilter) {
+        matchesRole = true;
+      } else {
+        const selRole = roles.find(r => r.id === roleFilter);
+        if (selRole) {
+          const userRoleName = getRoleName(user.role_id).toLowerCase();
+          const targetName = selRole.name.toLowerCase();
+          matchesRole = userRoleName === targetName ||
+                        userRoleName.includes(targetName) ||
+                        user.role_id === `role-${targetName}`;
+        } else {
+          matchesRole = false;
+        }
+      }
+    }
+
     const matchesStatus = statusFilter ? user.active.toString() === statusFilter : true;
 
     return matchesSearch && matchesRole && matchesStatus;
@@ -328,7 +345,8 @@ const UsersList = () => {
       </div>
 
       <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
-        <div className="table-responsive">
+        {/* Desktop Table View */}
+        <div className="desktop-table-view table-responsive">
           <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
             <thead style={{ backgroundColor: 'var(--color-background)', borderBottom: '2px solid var(--color-border)' }}>
               <tr>
@@ -467,6 +485,119 @@ const UsersList = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards View (< 768px) */}
+        <div className="mobile-cards-view" style={{ flexDirection: 'column', gap: '10px', padding: '12px' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>
+              {isRtl ? 'جاري تحميل المستخدمين...' : 'Loading users...'}
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--color-text-muted)' }}>
+              <p style={{ fontWeight: 600, margin: 0 }}>
+                {isRtl ? 'لم يتم العثور على مستخدمين يطابقون خيارات البحث أو التصفية' : 'No users found matching current filters'}
+              </p>
+            </div>
+          ) : (
+            filteredUsers.map(user => {
+              const roleName = getRoleName(user.role_id);
+              const badgeStyle = getRoleBadgeStyle(roleName);
+              return (
+                <div 
+                  key={`user-card-${user.id}`}
+                  style={{
+                    backgroundColor: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>
+                      {user.first_name} {user.last_name}
+                    </div>
+                    <span 
+                      style={{ 
+                        ...badgeStyle,
+                        padding: '2px 8px', 
+                        borderRadius: '6px', 
+                        fontSize: '0.72rem', 
+                        fontWeight: 600 
+                      }}
+                    >
+                      {roleName}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>
+                    {user.email}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--color-border)', paddingTop: '8px', marginTop: '2px' }}>
+                    <div>
+                      {user.active ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'rgb(16, 185, 129)', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 600 }}>
+                          <CheckCircle size={12} /> {t('common.active') || (isRtl ? 'نشط' : 'Active')}
+                        </span>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'rgb(239, 68, 68)', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 600 }}>
+                          <XCircle size={12} /> {t('common.inactive') || (isRtl ? 'غير نشط' : 'Inactive')}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {hasPermission('users.update') && (
+                        <button 
+                          type="button"
+                          onClick={() => handleEdit(user)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-background)',
+                            color: 'var(--color-primary)',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Edit2 size={13} /> {isRtl ? 'تعديل' : 'Edit'}
+                        </button>
+                      )}
+                      {hasPermission('users.activate') && (
+                        <button 
+                          type="button"
+                          onClick={() => handleToggleStatus(user)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: user.active ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(16, 185, 129, 0.25)',
+                            backgroundColor: user.active ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                            color: user.active ? 'rgb(239, 68, 68)' : 'rgb(16, 185, 129)',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <ShieldAlert size={13} /> {user.active ? (isRtl ? 'تعطيل' : 'Deactivate') : (isRtl ? 'تفعيل' : 'Activate')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

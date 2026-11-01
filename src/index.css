@@ -580,3 +580,95 @@ body {
 [data-theme='dark'] .sidebar-item:hover {
   background-color: var(--sidebar-hover);
 }
+
+/* =========================================================================
+   ENTERPRISE MOBILE COMPATIBILITY & APP READINESS (Android & iOS)
+   ========================================================================= */
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* iOS Safari & WebView Auto-Zoom Prevention */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="search"],
+  input[type="date"],
+  select,
+  textarea,
+  .form-input,
+  .form-select {
+    font-size: 16px !important; /* Prevents iOS auto-zoom upon field focus */
+  }
+
+  /* Safe Area Inset Support */
+  body {
+    padding-top: var(--sat);
+    padding-bottom: var(--sab);
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 999;
+    animation: fadeIn 0.25s ease-out;
+  }
+
+  /* Touch-Friendly Buttons and Tap Targets */
+  .btn,
+  button:not(.btn-icon):not(.close-btn),
+  .hamburger-btn {
+    min-height: 42px;
+  }
+
+  /* Compact Card Padding on Small Mobile Screens */
+  .card {
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* Touch Action & Scrolling Optimizations */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Ensure no page-level horizontal overflow */
+html, body, #root, .app-container {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Responsive Table & Card View Toggling */
+@media (max-width: 767px) {
+  .desktop-table-view {
+    display: none !important;
+  }
+  .mobile-cards-view {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .desktop-table-view {
+    display: block !important;
+  }
+  .mobile-cards-view {
+    display: none !important;
+  }
+}

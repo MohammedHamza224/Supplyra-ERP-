@@ -541,7 +541,8 @@ const InventoryList = () => {
             </select>
           </div>
 
-          <div className="table-responsive">
+          {/* Desktop Table View (>= 768px) */}
+          <div className="desktop-table-view table-responsive">
             <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left', height: '40px' }}>
@@ -724,6 +725,87 @@ const InventoryList = () => {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Cards View (< 768px for Smartphones & Small Tablets) */}
+          <div className="mobile-cards-view" style={{ flexDirection: 'column', gap: '10px', padding: '12px' }}>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>
+                {t('common.loading')}
+              </div>
+            ) : filteredBatches.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--color-text-muted)' }}>
+                <p style={{ fontWeight: 600, margin: 0 }}>
+                  {isRtl ? 'لا توجد دفعات مخزون مطابقة' : 'No inventory batches found'}
+                </p>
+              </div>
+            ) : (
+              paginatedBatches.map(batch => (
+                <div 
+                  key={`card-${batch.id}`} 
+                  style={{
+                    backgroundColor: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-text-primary)' }}>
+                        {batch.product_name || '-'}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '3px', flexWrap: 'wrap' }}>
+                        {batch.product_code && (
+                          <span style={{ fontSize: '0.7rem', fontFamily: 'monospace', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '1px 5px', borderRadius: '4px' }}>
+                            {batch.product_code}
+                          </span>
+                        )}
+                        <span style={{ fontSize: '0.7rem', fontFamily: 'monospace', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '1px 5px', borderRadius: '4px' }}>
+                          #{batch.batch_number}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      {getStatusBadge(batch.expiry_status)}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+                    <Building2 size={13} color="var(--color-text-muted)" />
+                    <span>{batch.warehouse_name || '-'}</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', backgroundColor: 'var(--color-background)', padding: '8px 10px', borderRadius: '6px', fontSize: '0.8rem', textAlign: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{isRtl ? 'المتبقي' : 'Remaining'}</div>
+                      <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', fontSize: '0.875rem' }}>{batch.quantity}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{isRtl ? 'التكلفة' : 'Cost'}</div>
+                      <div style={{ fontWeight: 600 }}>{Number(batch.purchase_price).toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{isRtl ? 'القيمة' : 'Value'}</div>
+                      <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{Number(batch.inventory_value).toFixed(2)}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: 'var(--color-text-secondary)', borderTop: '1px dashed var(--color-border)', paddingTop: '6px' }}>
+                    <span>{isRtl ? 'الصلاحية:' : 'Expiry:'} <strong>{batch.expiry_date || '-'}</strong></span>
+                    <span style={{ fontWeight: 600, color: batch.days_remaining !== undefined && batch.days_remaining <= 30 ? '#dc2626' : 'inherit' }}>
+                      {batch.days_remaining !== undefined && batch.days_remaining !== null
+                        ? (batch.days_remaining <= 0 ? (isRtl ? 'منتهي' : 'Expired') : `${batch.days_remaining} ${isRtl ? 'يوم' : 'days'}`)
+                        : '-'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Pagination Footer */}

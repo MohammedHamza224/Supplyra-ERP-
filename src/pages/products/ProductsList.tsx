@@ -619,7 +619,8 @@ if (
         </div>
 
         <div className="card-body" style={{ padding: 0 }}>
-          <div className="table-responsive">
+          {/* Desktop Table View */}
+          <div className="desktop-table-view table-responsive">
             <table className="table" style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
@@ -780,6 +781,147 @@ if (
               )}
             </tbody>
           </table>
+          </div>
+
+          {/* Mobile Cards View (< 768px) */}
+          <div className="mobile-cards-view" style={{ flexDirection: 'column', gap: '10px', padding: '12px' }}>
+            {products.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '28px 16px', color: 'var(--color-text-secondary)' }}>
+                {t('products.noProducts')}
+              </div>
+            ) : (
+              products.map((product) => {
+                const ps = product.product_suppliers || [];
+                const primary = ps.find((s: any) => s.is_preferred) || ps[0];
+                const suppName = primary?.suppliers?.name;
+
+                return (
+                  <div
+                    key={`prod-card-${product.id}`}
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>
+                          {product.name}
+                        </div>
+                        <span style={{ fontSize: '0.7rem', fontFamily: 'monospace', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '1px 6px', borderRadius: '4px', marginTop: '3px', display: 'inline-block' }}>
+                          {product.product_code}
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          backgroundColor: product.active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                          color: product.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)'
+                        }}
+                      >
+                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: product.active ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)' }} />
+                        {product.active ? t('products.active') : t('products.inactive')}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+                      {product.category?.name && (
+                        <span style={{ backgroundColor: 'var(--color-background)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+                          {product.category.name}
+                        </span>
+                      )}
+                      {product.brand?.name && (
+                        <span style={{ backgroundColor: 'var(--color-background)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+                          {product.brand.name}
+                        </span>
+                      )}
+                      {suppName && (
+                        <span style={{ color: 'var(--color-text-muted)' }}>
+                          {isRtl ? 'المورد:' : 'Supplier:'} {suppName}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--color-border)', paddingTop: '8px', marginTop: '2px' }}>
+                      <div>
+                        <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+                          {Number(product.selling_price).toFixed(2)}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginInlineStart: '4px' }}>
+                          {t('products.currency')}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {hasPermission('products.update') && (
+                          <button
+                            type="button"
+                            onClick={() => navigate('/inventory?product_id=' + product.id)}
+                            style={{
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              backgroundColor: 'var(--color-background)',
+                              color: 'var(--color-text-secondary)',
+                              cursor: 'pointer'
+                            }}
+                            title={t('products.manageStock')}
+                          >
+                            <Package size={15} />
+                          </button>
+                        )}
+                        {hasPermission('products.update') && (
+                          <button
+                            type="button"
+                            onClick={() => openModal(product)}
+                            style={{
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              backgroundColor: 'var(--color-background)',
+                              color: 'var(--color-primary)',
+                              cursor: 'pointer'
+                            }}
+                            title={t('products.edit')}
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                        )}
+                        {hasPermission('products.delete') && (
+                          <button
+                            type="button"
+                            onClick={() => confirmDeleteClick(product.id)}
+                            style={{
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                              color: 'rgb(239, 68, 68)',
+                              cursor: 'pointer'
+                            }}
+                            title={t('common.delete')}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>

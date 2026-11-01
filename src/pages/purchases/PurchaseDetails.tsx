@@ -175,7 +175,9 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
     );
   }
 
-  const grandTotal = Number(purchase?.grand_total ?? purchase?.total_amount ?? purchase?.total ?? purchase?.subtotal ?? 0);
+  const calculatedItemsTotal = items.reduce((acc, it) => acc + (Number(it.total) || (Number(it.quantity || 0) * Number(it.purchase_price || 0)) || 0), 0);
+  const rawTotal = Number(purchase?.grand_total ?? purchase?.total_amount ?? purchase?.total ?? purchase?.subtotal ?? 0);
+  const grandTotal = (!isNaN(rawTotal) && rawTotal > 0) ? rawTotal : calculatedItemsTotal;
 
   return (
     <div style={{
