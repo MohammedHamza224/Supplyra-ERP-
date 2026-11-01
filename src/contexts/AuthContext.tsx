@@ -164,6 +164,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const hasPermission = (permission: string) => {
+    if (roleName?.toLowerCase() === 'manager' || roleName?.toLowerCase() === 'admin' || roleName === 'مدير' || roleName === 'مدير النظام') {
+      return true;
+    }
     return permissions.includes(permission);
   };
 

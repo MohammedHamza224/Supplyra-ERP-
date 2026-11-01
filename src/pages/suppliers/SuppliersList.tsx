@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Plus, Edit2, Trash2, Search, X, Truck } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
+import SupplierProducts from './SupplierProducts';
 
 const SuppliersList = () => {
   const { t, language } = useTranslation();
@@ -484,6 +485,12 @@ const SuppliersList = () => {
                     </div>
                   </div>
                 </div>
+
+                {editingId && (
+                  <div style={{ marginTop: '12px', borderTop: '1px solid var(--color-border)', paddingTop: '12px' }}>
+                    <SupplierProducts supplierId={editingId} />
+                  </div>
+                )}
 
               </div>
               <div className="card-footer" style={{ padding: '10px 14px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--color-border)' }}>

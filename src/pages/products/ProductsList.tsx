@@ -1039,6 +1039,13 @@ if (
                     </div>
                   </div>
                 )}
+
+                {/* Manage Product Suppliers (for existing products) */}
+                {editingId && (
+                  <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+                    <ProductSuppliers productId={editingId} />
+                  </div>
+                )}
               </div>
               <div
                 className="card-footer"

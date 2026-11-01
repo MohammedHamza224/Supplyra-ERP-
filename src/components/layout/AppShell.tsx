@@ -15,6 +15,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const { t, language } = useTranslation();
   const { profile, roleName } = useAuth();
+  const isRtl = language === 'ar';
   
   // Responsive navigation state
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
@@ -80,22 +81,42 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     await supabase.auth.signOut();
   };
 
-  const navItems = [
-    { name: t('appShell.navigation.dashboard'), path: '/', icon: LayoutDashboard, show: true },
-    { name: t('appShell.navigation.products'), path: '/products', icon: Package, show: canViewProducts },
-    { name: t('inventory.title'), path: '/inventory', icon: ClipboardList, show: canViewProducts },
-    { name: t('appShell.navigation.suppliers'), path: '/suppliers', icon: Factory, show: canViewSuppliers },
-    { name: t('appShell.navigation.customers'), path: '/customers', icon: Users, show: canViewCustomers },
-    { name: t('appShell.navigation.warehouses'), path: '/warehouses', icon: MapPin, show: canViewWarehouses },
-    { name: t('appShell.navigation.users'), path: '/users', icon: Shield, show: canViewUsers },
-    { name: t('sales.title') || 'Sales', path: '/sales', icon: ShoppingCart, show: canViewSales },
-    { name: t('purchases.title') || 'Purchasing', path: '/purchases', icon: Truck, show: canViewPurchases },
-    { name: t('appShell.navigation.analytics') || 'Analytics', path: '/analytics', icon: BarChart3, show: canViewAnalytics },
-    { name: t('appShell.navigation.ai') || 'AI Assistant', path: '/ai-assistant', icon: Sparkles, show: canViewAI },
-    { name: t('appShell.navigation.settings') || 'Settings', path: '/settings', icon: Settings, show: true, disabled: false },
-  ];
+  const isManager = roleName?.toLowerCase() === 'manager' || roleName?.toLowerCase() === 'admin' || roleName === 'مدير' || roleName === 'مدير النظام';
 
-  const isRtl = language === 'ar';
+  const navGroups = [
+    {
+      title: isRtl ? 'الرئيسية والتحليلات' : 'Core & Analytics',
+      items: [
+        { name: t('appShell.navigation.dashboard'), path: '/', icon: LayoutDashboard, show: true },
+        { name: t('appShell.navigation.analytics') || (isRtl ? 'التحليلات والتقارير' : 'Analytics'), path: '/analytics', icon: BarChart3, show: isManager || canViewAnalytics },
+        { name: t('appShell.navigation.ai') || (isRtl ? 'المساعد الذكي AI' : 'AI Assistant'), path: '/ai-assistant', icon: Sparkles, show: isManager || canViewAI },
+      ]
+    },
+    {
+      title: isRtl ? 'العمليات والمخزون' : 'Operations & Inventory',
+      items: [
+        { name: t('appShell.navigation.products'), path: '/products', icon: Package, show: isManager || canViewProducts },
+        { name: t('inventory.title') || (isRtl ? 'دفعات المخزون' : 'Inventory Batches'), path: '/inventory', icon: ClipboardList, show: isManager || canViewProducts },
+        { name: t('sales.title') || (isRtl ? 'المبيعات ونقاط البيع' : 'Sales & POS'), path: '/sales', icon: ShoppingCart, show: isManager || canViewSales },
+        { name: t('purchases.title') || (isRtl ? 'المشتريات والتوريد' : 'Purchasing'), path: '/purchases', icon: Truck, show: isManager || canViewPurchases },
+      ]
+    },
+    {
+      title: isRtl ? 'الشركاء والمواقع' : 'Stakeholders & Locations',
+      items: [
+        { name: t('appShell.navigation.customers'), path: '/customers', icon: Users, show: isManager || canViewCustomers },
+        { name: t('appShell.navigation.suppliers'), path: '/suppliers', icon: Factory, show: isManager || canViewSuppliers },
+        { name: t('appShell.navigation.warehouses'), path: '/warehouses', icon: MapPin, show: isManager || canViewWarehouses },
+      ]
+    },
+    {
+      title: isRtl ? 'إدارة النظام' : 'System & Settings',
+      items: [
+        { name: t('appShell.navigation.users'), path: '/users', icon: Shield, show: isManager || canViewUsers },
+        { name: t('appShell.navigation.settings') || (isRtl ? 'إعدادات النظام' : 'Settings'), path: '/settings', icon: Settings, show: true },
+      ]
+    }
+  ];
 
   return (
     <div className="app-container" style={{ direction: isRtl ? 'rtl' : 'ltr', display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
@@ -216,48 +237,74 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
           )}
         </div>
         
-        {/* Navigation List */}
-        <nav style={{ flex: 1, padding: 'var(--spacing-4) 0', overflowY: 'auto' }}>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {navItems.filter(item => item.show).map((item) => {
-              const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path + '/'));
+        {/* Navigation List with Enterprise Grouping & Slim Scroll */}
+        <nav className="sidebar-nav" style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {navGroups.map((group, groupIdx) => {
+              const visibleItems = group.items.filter(item => item.show);
+              if (visibleItems.length === 0) return null;
               const showText = !isDesktopCollapsed || isMobileOrTablet;
-              
+
               return (
-                <li key={item.name} style={{ padding: showText ? '0 var(--spacing-4)' : '0 var(--spacing-2)' }}>
-                  <Link 
-                    to={item.path} 
-                    style={{ 
-                      padding: showText ? '10px 14px' : '10px 0', 
-                      minHeight: '44px',
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: showText ? 'flex-start' : 'center',
-                      gap: 'var(--spacing-3)', 
-                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-                      backgroundColor: isActive ? 'var(--sidebar-active)' : 'transparent',
-                      textDecoration: 'none',
-                      borderRadius: 'var(--radius-md)',
-                      transition: 'all 0.2s ease',
-                      fontWeight: isActive ? 600 : 500,
-                      fontSize: '0.9375rem',
-                      boxShadow: isActive ? 'var(--shadow-glow)' : 'none',
-                      border: isActive ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent',
-                      touchAction: 'manipulation'
-                    }}
-                    title={!showText ? item.name : undefined}
-                  >
-                    <item.icon size={20} style={{ color: isActive ? 'var(--color-primary-light)' : 'inherit', flexShrink: 0 }} />
-                    {showText && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</span>}
-                  </Link>
-                </li>
+                <div key={groupIdx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  {showText ? (
+                    <div style={{ 
+                      padding: '6px 18px 2px', 
+                      fontSize: '0.6875rem', 
+                      fontWeight: 700, 
+                      color: 'rgba(148, 163, 184, 0.55)', 
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase'
+                    }}>
+                      {group.title}
+                    </div>
+                  ) : (
+                    groupIdx > 0 && <div style={{ height: '1px', backgroundColor: 'var(--sidebar-border)', margin: '4px 14px' }} />
+                  )}
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {visibleItems.map((item) => {
+                      const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path + '/'));
+                      
+                      return (
+                        <li key={item.path} style={{ padding: showText ? '0 12px' : '0 8px' }}>
+                          <Link 
+                            to={item.path} 
+                            style={{ 
+                              padding: showText ? '7px 12px' : '7px 0', 
+                              minHeight: '38px',
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: showText ? 'flex-start' : 'center',
+                              gap: '10px', 
+                              color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                              backgroundColor: isActive ? 'var(--sidebar-active)' : 'transparent',
+                              textDecoration: 'none',
+                              borderRadius: 'var(--radius-md)',
+                              transition: 'all 0.15s ease',
+                              fontWeight: isActive ? 600 : 500,
+                              fontSize: '0.875rem',
+                              boxShadow: isActive ? 'var(--shadow-glow)' : 'none',
+                              border: isActive ? '1px solid rgba(16,185,129,0.25)' : '1px solid transparent',
+                              touchAction: 'manipulation'
+                            }}
+                            title={!showText ? item.name : undefined}
+                          >
+                            <item.icon size={18} style={{ color: isActive ? 'var(--color-primary-light)' : 'inherit', flexShrink: 0 }} />
+                            {showText && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</span>}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               );
             })}
-          </ul>
+          </div>
         </nav>
 
         {/* Sidebar Footer - Logout */}
-        <div style={{ padding: isDesktopCollapsed && !isMobileOrTablet ? 'var(--spacing-4) var(--spacing-2)' : 'var(--spacing-4) var(--spacing-6)', borderTop: '1px solid var(--sidebar-border)' }}>
+        <div style={{ padding: isDesktopCollapsed && !isMobileOrTablet ? '10px 8px' : '10px 14px', borderTop: '1px solid var(--sidebar-border)' }}>
           <button 
             onClick={handleLogout} 
             style={{ 
@@ -265,22 +312,22 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: (!isDesktopCollapsed || isMobileOrTablet) ? 'flex-start' : 'center',
-              gap: '12px', 
+              gap: '10px', 
               color: 'var(--sidebar-text)', 
               backgroundColor: 'transparent', 
               border: 'none', 
               cursor: 'pointer', 
-              padding: '10px 14px',
-              minHeight: '44px',
+              padding: '8px 12px',
+              minHeight: '38px',
               borderRadius: 'var(--radius-md)', 
-              transition: 'all 0.2s ease',
+              transition: 'all 0.15s ease',
               fontWeight: 500, 
-              fontSize: '0.9375rem',
+              fontSize: '0.875rem',
               touchAction: 'manipulation'
             }}
             title={isRtl ? 'تسجيل الخروج' : 'Logout'}
           >
-            <LogOut size={20} style={{ flexShrink: 0 }} />
+            <LogOut size={18} style={{ flexShrink: 0 }} />
             {(!isDesktopCollapsed || isMobileOrTablet) && <span>{t('appShell.logout')}</span>}
           </button>
         </div>

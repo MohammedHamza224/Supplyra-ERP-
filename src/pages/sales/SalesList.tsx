@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { Plus, Search, Eye, Edit2, Filter, BarChart2, List, ShieldCheck, ShoppingCart, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -12,8 +13,11 @@ import { useDebounce } from '../../hooks/useDebounce';
 const SalesList = () => {
   const { t, language } = useTranslation();
   const { hasPermission, user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  const [viewMode, setViewMode] = useState<'list' | 'analytics'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'analytics'>(() => {
+    return searchParams.get('view') === 'analytics' ? 'analytics' : 'list';
+  });
 
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +26,9 @@ const SalesList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(() => {
+    return searchParams.get('pos') === 'true' || searchParams.get('new') === 'true';
+  });
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<any>(null);
   

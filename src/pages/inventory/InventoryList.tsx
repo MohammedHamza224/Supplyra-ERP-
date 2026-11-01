@@ -91,7 +91,7 @@ const InventoryList = () => {
     try {
       const { data } = await supabase
         .from('warehouses')
-        .select('id, code, name, location, notes, active')
+        .select('*')
         .eq('id', wId)
         .maybeSingle();
       if (data) setSelectedWarehouseSummary(data);
