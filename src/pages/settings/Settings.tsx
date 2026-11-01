@@ -54,11 +54,28 @@ export default function Settings() {
 
   const loadSystemSettings = async () => {
     try {
-      // Primary Source of Truth: Supabase company_settings table
-      const { data: dbData, error } = await supabase.from('company_settings').select('*').limit(1).maybeSingle();
-      if (dbData && !error) {
+      // Primary Source of Truth: Supabase business_settings table (with fallback to company_settings)
+      let dbData: any = null;
+      const { data: bData, error: bErr } = await supabase.from('business_settings').select('*').limit(1).maybeSingle();
+      if (bData && !bErr) {
+        dbData = {
+          system_name: bData.company_name,
+          company_name: bData.company_name,
+          logo_url: bData.logo_url,
+          phone: bData.phone,
+          address: bData.company_address,
+          vat_rate: bData.vat_percentage,
+          tax_number: bData.tax_number,
+          currency: bData.currency,
+        };
+      } else {
+        const { data: cData, error: cErr } = await supabase.from('company_settings').select('*').limit(1).maybeSingle();
+        if (cData && !cErr) dbData = cData;
+      }
+
+      if (dbData) {
         const primarySettings = {
-          systemName: dbData.system_name || dbData.company_name || 'Suppliera ERP',
+          systemName: dbData.system_name || dbData.company_name || 'Supplyra ERP',
           logoUrl: dbData.logo_url || '',
           phone: dbData.phone || '+966 50 000 0000',
           address: dbData.address || 'Riyadh, Saudi Arabia',
@@ -86,7 +103,18 @@ export default function Settings() {
     setSavingSettings(true);
     setSettingsMsg(null);
 
-    const payload = {
+    const payloadBusiness = {
+      company_name: systemSettings.systemName,
+      logo_url: systemSettings.logoUrl,
+      phone: systemSettings.phone,
+      company_address: systemSettings.address,
+      vat_percentage: systemSettings.vatRate,
+      tax_number: systemSettings.taxNumber,
+      currency: systemSettings.currency,
+      updated_at: new Date().toISOString()
+    };
+
+    const payloadCompany = {
       system_name: systemSettings.systemName,
       company_name: systemSettings.systemName,
       logo_url: systemSettings.logoUrl,
@@ -99,14 +127,24 @@ export default function Settings() {
     };
 
     try {
-      // Primary Persistence: Save to Supabase company_settings
-      const { data: existing } = await supabase.from('company_settings').select('id').limit(1).maybeSingle();
-      if (existing?.id) {
-        const { error: updateErr } = await supabase.from('company_settings').update(payload).eq('id', existing.id);
+      // Primary Persistence: Save to Supabase business_settings
+      const { data: existingB } = await supabase.from('business_settings').select('id').limit(1).maybeSingle();
+      if (existingB?.id) {
+        const { error: updateErr } = await supabase.from('business_settings').update(payloadBusiness).eq('id', existingB.id);
         if (updateErr) throw updateErr;
       } else {
-        const { error: insertErr } = await supabase.from('company_settings').insert([payload]);
+        const { error: insertErr } = await supabase.from('business_settings').insert([payloadBusiness]);
         if (insertErr) throw insertErr;
+      }
+
+      // Optional Sync: Also update company_settings if it exists in the schema
+      try {
+        const { data: existingC } = await supabase.from('company_settings').select('id').limit(1).maybeSingle();
+        if (existingC?.id) {
+          await supabase.from('company_settings').update(payloadCompany).eq('id', existingC.id);
+        }
+      } catch (_) {
+        // Table company_settings might not be present; business_settings is canonical
       }
 
       // Sync offline cache
