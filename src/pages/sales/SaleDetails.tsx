@@ -211,18 +211,70 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
     return d.toLocaleTimeString(isRtl ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const getOrderStatusLabel = (status: string) => {
+    if (!status) return '-';
+    const s = String(status).toUpperCase();
+    if (language === 'ar') {
+      switch (s) {
+        case 'CONFIRMED': return 'مؤكد';
+        case 'COMPLETED': return 'مكتمل';
+        case 'CANCELLED': return 'ملغاة';
+        case 'PENDING': return 'قيد الانتظار';
+        case 'PREPARING': return 'قيد التجهيز';
+        case 'READY': return 'جاهز';
+        case 'DELIVERED': return 'تم التسليم';
+        default: return status;
+      }
+    }
+    return status;
+  };
+
+  const getPaymentStatusLabel = (status: string) => {
+    if (!status) return '-';
+    const s = String(status).toUpperCase();
+    if (language === 'ar') {
+      switch (s) {
+        case 'PAID': return 'مدفوع بالكامل';
+        case 'PARTIALLY_PAID': return 'مدفوع جزئياً';
+        case 'UNPAID': return 'غير مدفوع';
+        case 'REFUNDED': return 'مسترد';
+        default: return status;
+      }
+    }
+    return status;
+  };
+
+  const getPaymentMethodLabel = (method: string) => {
+    if (!method) return '-';
+    const m = String(method).toLowerCase();
+    if (language === 'ar') {
+      switch (m) {
+        case 'cash': return 'نقداً';
+        case 'card': return 'بطاقة مدى / ائتمان';
+        case 'bank_transfer': return 'تحويل بنكي';
+        case 'credit': return 'آجل';
+        default: return method;
+      }
+    }
+    return method;
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 1000,
-      display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px',
-      direction: isRtl ? 'rtl' : 'ltr'
-    }}>
+    <div 
+      style={{
+        position: 'fixed', inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 1000,
+        display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '24px 16px',
+        overflowY: 'auto',
+        direction: isRtl ? 'rtl' : 'ltr'
+      }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div style={{
-        backgroundColor: 'var(--color-surface)', width: '100%', maxWidth: '820px',
-        maxHeight: '86vh', borderRadius: '12px', display: 'flex', flexDirection: 'column',
+        backgroundColor: 'var(--color-surface)', width: '100%', maxWidth: '840px',
+        maxHeight: 'calc(100vh - 48px)', margin: 'auto 0', borderRadius: '12px', display: 'flex', flexDirection: 'column',
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', border: '1px solid var(--color-border)', overflow: 'hidden'
       }}>
         
@@ -230,7 +282,7 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
         <div style={{
           padding: '12px 20px', borderBottom: '1px solid var(--color-border)',
           backgroundColor: 'var(--color-surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          flexWrap: 'wrap', gap: '10px'
+          flexWrap: 'wrap', gap: '10px', flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <FileText size={20} color="var(--color-primary)" />
@@ -327,10 +379,10 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
                   </span>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <span className={`badge ${sale.status === 'COMPLETED' || sale.status === 'CONFIRMED' ? 'badge-success' : sale.status === 'CANCELLED' ? 'badge-danger' : 'badge-neutral'}`}>
-                      {sale.status}
+                      {getOrderStatusLabel(sale.status)}
                     </span>
                     <span className={`badge ${sale.payment_status === 'PAID' ? 'badge-success' : sale.payment_status === 'PARTIALLY_PAID' ? 'badge-warning' : 'badge-neutral'}`}>
-                      {sale.payment_status}
+                      {getPaymentStatusLabel(sale.payment_status)}
                     </span>
                     <span style={{
                       padding: '2px 8px',
@@ -386,7 +438,7 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
                 </h3>
 
                 <div className="table-responsive" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
-                  <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
+                  <table className="table" style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
                         <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', width: '40px' }}>#</th>
@@ -451,12 +503,12 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
                       {payments.map(p => (
                         <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: 'var(--color-background)', borderRadius: '6px', border: '1px solid var(--color-border)' }}>
                           <div>
-                            <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{p.payment_method}</div>
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{getPaymentMethodLabel(p.payment_method)}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{formatDate(p.payment_date || p.created_at)}</div>
                           </div>
-                          <div style={{ textAlign: 'right' }}>
+                          <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
                             <div style={{ fontWeight: 700, color: '#10b981', fontSize: '0.9rem' }}>{formatCurrency(p.amount)}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{p.status}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{getOrderStatusLabel(p.status)}</div>
                           </div>
                         </div>
                       ))}

@@ -29,43 +29,98 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
   const fetchPurchaseData = async () => {
     try {
       setLoading(true);
+      setError('');
       
-      const { data: pData, error: pError } = await supabase
+      // 1. Fetch purchase record safely
+      let pData: any = null;
+      const { data: pJoined, error: pJoinErr } = await supabase
         .from('purchases')
         .select(`
           *,
-          supplier:suppliers(name, phone, email, address, tax_number),
+          supplier:suppliers(name, phone, email),
           warehouse:warehouses(name)
         `)
         .eq('id', purchaseId)
-        .single();
-        
-      if (pError) throw pError;
+        .maybeSingle();
+
+      if (pJoinErr || !pJoined) {
+        console.warn('Purchase detail join query notice, falling back to base select:', pJoinErr?.message);
+        const { data: pBase, error: pBaseErr } = await supabase
+          .from('purchases')
+          .select('*')
+          .eq('id', purchaseId)
+          .maybeSingle();
+
+        if (pBaseErr) throw pBaseErr;
+        pData = pBase;
+
+        if (pData?.supplier_id) {
+          const { data: s } = await supabase.from('suppliers').select('name, phone, email').eq('id', pData.supplier_id).maybeSingle();
+          if (s) pData.supplier = s;
+        }
+        if (pData?.warehouse_id) {
+          const { data: w } = await supabase.from('warehouses').select('name').eq('id', pData.warehouse_id).maybeSingle();
+          if (w) pData.warehouse = w;
+        }
+      } else {
+        pData = pJoined;
+      }
+
       setPurchase(pData);
 
-      const { data: iData, error: iError } = await supabase
+      // 2. Fetch purchase items safely
+      let itemsList: any[] = [];
+      const { data: iJoined, error: iJoinErr } = await supabase
         .from('purchase_items')
         .select(`
           *,
-          product:products(
-            name,
-            product_code,
-            category:categories(name),
-            brand:brands(name)
-          ),
-          unit:units(name, code)
+          product:products(name, product_code)
         `)
         .eq('purchase_id', purchaseId);
-        
-      if (iError) throw iError;
-      setItems(iData || []);
-      
+
+      if (iJoinErr || !iJoined) {
+        console.warn('Purchase items detail join notice, falling back:', iJoinErr?.message);
+        const { data: iBase, error: iBaseErr } = await supabase
+          .from('purchase_items')
+          .select('*')
+          .eq('purchase_id', purchaseId);
+
+        if (iBaseErr) throw iBaseErr;
+        itemsList = iBase || [];
+
+        if (itemsList.length > 0) {
+          const prodIds = itemsList.map((it: any) => it.product_id).filter(Boolean);
+          if (prodIds.length > 0) {
+            const { data: prods } = await supabase.from('products').select('id, name, product_code').in('id', prodIds);
+            const pMap = new Map((prods || []).map((p: any) => [p.id, p]));
+            itemsList = itemsList.map((it: any) => ({
+              ...it,
+              product: pMap.get(it.product_id) || it.product
+            }));
+          }
+        }
+      } else {
+        itemsList = iJoined;
+      }
+
+      setItems(itemsList);
     } catch (err: any) {
-      console.error(err);
-      setError('Failed to load details');
+      console.error('Error fetching purchase details:', err);
+      setError(language === 'ar' ? 'تعذر تحميل بعض تفاصيل الفاتورة.' : 'Failed to load details');
     } finally {
       setLoading(false);
     }
+  };
+
+  const getStatusText = (status: string) => {
+    const s = (status || '').toUpperCase();
+    if (s === 'PENDING') return isRtl ? 'قيد الانتظار' : 'Pending';
+    if (s === 'CONFIRMED') return isRtl ? 'مؤكد' : 'Confirmed';
+    if (s === 'RECEIVED') return isRtl ? 'مستلمة' : 'Received';
+    if (s === 'DRAFT') return isRtl ? 'مسودة' : 'Draft';
+    if (s === 'ORDERED') return isRtl ? 'مطلوبة' : 'Ordered';
+    if (s === 'CANCELLED') return isRtl ? 'ملغاة' : 'Cancelled';
+    return t(`purchases.${status?.toLowerCase()}`) || status;
   };
 
   const handleReceive = async () => {
@@ -120,52 +175,74 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
     );
   }
 
+  const grandTotal = Number(purchase?.grand_total ?? purchase?.total_amount ?? purchase?.total ?? purchase?.subtotal ?? 0);
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
-      display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '24px'
+      backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)', zIndex: 1000,
+      display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '24px 16px',
+      overflowY: 'auto', direction: isRtl ? 'rtl' : 'ltr'
     }}>
       <div style={{
-        backgroundColor: 'var(--color-surface)', width: '100%', maxWidth: '1000px',
-        maxHeight: '90vh', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column',
-        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+        backgroundColor: 'var(--color-surface)', width: '100%', maxWidth: '960px',
+        maxHeight: 'calc(100vh - 48px)', margin: 'auto 0', borderRadius: '12px', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.25)', overflow: 'hidden', border: '1px solid var(--color-border)'
       }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-surface)', flexShrink: 0 }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-primary)' }}>
             <ShoppingCart size={20} color="var(--color-primary)" />
-            {purchase.purchase_number} - {purchase.supplier?.name}
+            <span>{purchase?.purchase_number || (isRtl ? 'فاتورة مشتريات' : 'Purchase Invoice')} {purchase?.supplier?.name ? `— ${purchase.supplier.name}` : ''}</span>
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
-            <X size={24} />
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: '4px' }}>
+            <X size={20} />
           </button>
         </div>
 
-        <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
-          {error && <div style={{ padding: '12px', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>{error}</div>}
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {error && <div style={{ padding: '12px', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: 'var(--radius-md)', fontSize: '0.875rem' }}>{error}</div>}
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '20px', marginBottom: '24px', backgroundColor: 'var(--color-background)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '14px', backgroundColor: 'var(--color-background)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{t('purchases.date')}</div>
-              <div style={{ fontWeight: 500 }}>{purchase.purchase_date}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '2px' }}>{t('purchases.date')}</div>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                {purchase?.purchase_date ? new Date(purchase.purchase_date).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US') : (purchase?.created_at ? new Date(purchase.created_at).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US') : '-')}
+              </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{t('purchases.warehouse')}</div>
-              <div style={{ fontWeight: 500 }}>{purchase.warehouse?.name}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '2px' }}>{t('purchases.warehouse')}</div>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{purchase?.warehouse?.name || '-'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{t('purchases.status')}</div>
-              <div style={{ fontWeight: 500 }}>{t(`purchases.${purchase.status.toLowerCase()}`) || purchase.status}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '2px' }}>{t('purchases.status')}</div>
+              <div>
+                <span style={{ 
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  backgroundColor: purchase?.status === 'RECEIVED' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                  color: purchase?.status === 'RECEIVED' ? 'rgb(16, 185, 129)' : 'rgb(217, 119, 6)'
+                }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: purchase?.status === 'RECEIVED' ? 'rgb(16, 185, 129)' : 'rgb(217, 119, 6)' }} />
+                  {getStatusText(purchase?.status)}
+                </span>
+              </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{t('purchases.invoiceNumber')}</div>
-              <div style={{ fontWeight: 500 }}>{purchase.invoice_number || '-'}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '2px' }}>{t('purchases.invoiceNumber')}</div>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{purchase?.invoice_number || '-'}</div>
             </div>
           </div>
 
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '16px' }}>{t('purchases.items')}</h3>
-          <div className="table-responsive" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
-            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '4px 0 0 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-primary)' }}>
+            {t('purchases.items')} ({items.length})
+          </h3>
+          <div className="table-responsive" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
+            <table className="table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--color-background)', borderBottom: '2px solid var(--color-border)', textAlign: isRtl ? 'right' : 'left' }}>
                 <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('purchases.product')}</th>
@@ -178,83 +255,91 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
-                <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
-                  <td style={{ padding: '10px 14px' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{item.product?.name}</div>
-                    {item.product?.product_code && (
-                      <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '1px 6px', borderRadius: '4px', marginTop: '2px', display: 'inline-block' }}>
-                        {item.product.product_code}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
-                    {item.product?.category?.name || '-'}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
-                    {item.product?.brand?.name || '-'}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>
-                    {item.batch_number ? (
-                      <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '2px 6px', borderRadius: '4px' }}>
-                        {item.batch_number}
-                      </span>
-                    ) : '-'}
-                    {item.expiry_date && (
-                      <div style={{ color: 'var(--color-text-muted)', fontSize: '0.72rem', marginTop: '2px' }}>Exp: {item.expiry_date}</div>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, fontSize: '0.875rem' }}>
-                    {item.quantity} {item.unit?.code || ''}
-                  </td>
-                  <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontSize: '0.85rem' }}>
-                    {Number(item.purchase_price).toFixed(2)}
-                  </td>
-                  <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.875rem' }}>
-                    {Number(item.total).toFixed(2)} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--color-text-secondary)' }}>{t('products.currency')}</span>
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                    {isRtl ? 'لا توجد بنود مسجلة لهذه الفاتورة' : 'No items recorded for this invoice'}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                items.map(item => (
+                  <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.15s ease' }}>
+                    <td style={{ padding: '10px 14px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{item.product?.name || (isRtl ? 'منتج غير محدد' : 'Item')}</div>
+                      {item.product?.product_code && (
+                        <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '1px 6px', borderRadius: '4px', marginTop: '2px', display: 'inline-block' }}>
+                          {item.product.product_code}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                      {item.product?.category?.name || '-'}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                      {item.product?.brand?.name || '-'}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>
+                      {item.batch_number ? (
+                        <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', padding: '2px 6px', borderRadius: '4px' }}>
+                          {item.batch_number}
+                        </span>
+                      ) : '-'}
+                      {item.expiry_date && (
+                        <div style={{ color: 'var(--color-text-muted)', fontSize: '0.72rem', marginTop: '2px' }}>Exp: {item.expiry_date}</div>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, fontSize: '0.875rem' }}>
+                      {item.quantity} {item.unit?.code || ''}
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontSize: '0.85rem' }}>
+                      {Number(item.purchase_price || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.875rem' }}>
+                      {Number(item.total || 0).toFixed(2)} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--color-text-secondary)' }}>{t('products.currency')}</span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
           </div>
           
-          {purchase.notes && (
+          {purchase?.notes && (
             <div>
-              <h3 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '8px' }}>{t('purchases.notes')}</h3>
-              <div style={{ padding: '12px', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', fontSize: '0.9rem' }}>{purchase.notes}</div>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 6px 0', color: 'var(--color-text-secondary)' }}>{t('purchases.notes')}</h3>
+              <div style={{ padding: '10px 14px', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>{purchase.notes}</div>
             </div>
           )}
         </div>
 
-        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-background)', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
-            {t('purchases.grandTotal')}: <span style={{ color: 'var(--color-primary)' }}>{Number(purchase.grand_total).toLocaleString()} {t('products.currency')}</span>
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-background)', flexWrap: 'wrap', gap: '12px', flexShrink: 0 }}>
+          <div style={{ fontSize: '1.15rem', fontWeight: 700 }}>
+            {t('purchases.grandTotal')}: <span style={{ color: 'var(--color-primary)' }}>{grandTotal.toLocaleString()} {t('products.currency')}</span>
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '10px' }}>
             <button 
               onClick={() => printPurchaseInvoice(purchase, items, language, 'SUPPLYRA')}
               type="button"
-              style={{ padding: '10px 20px', border: '1px solid var(--color-primary)', backgroundColor: 'var(--color-surface)', color: 'var(--color-primary)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}
+              style={{ padding: '8px 16px', border: '1px solid var(--color-primary)', backgroundColor: 'var(--color-surface)', color: 'var(--color-primary)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
             >
-              <Printer size={18} /> {language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
+              <Printer size={16} /> {language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
             </button>
 
-            {purchase.status !== 'CANCELLED' && hasPermission('purchases.cancel') && (
+            {purchase?.status !== 'CANCELLED' && hasPermission('purchases.cancel') && (
               <button 
                 onClick={handleCancel} disabled={actionLoading}
-                style={{ padding: '10px 20px', border: '1px solid #ef4444', backgroundColor: 'var(--color-surface)', color: '#ef4444', borderRadius: 'var(--radius-md)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}
+                style={{ padding: '8px 16px', border: '1px solid #ef4444', backgroundColor: 'var(--color-surface)', color: '#ef4444', borderRadius: 'var(--radius-md)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
               >
-                <XCircle size={18} /> {t('purchases.cancel')}
+                <XCircle size={16} /> {t('purchases.cancel')}
               </button>
             )}
             
-            {purchase.status === 'DRAFT' && hasPermission('purchases.receive') && (
+            {purchase?.status === 'DRAFT' && hasPermission('purchases.receive') && (
               <button 
                 onClick={handleReceive} disabled={actionLoading}
-                style={{ padding: '10px 20px', border: 'none', backgroundColor: '#10b981', color: 'white', borderRadius: 'var(--radius-md)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}
+                style={{ padding: '8px 16px', border: 'none', backgroundColor: '#10b981', color: 'white', borderRadius: 'var(--radius-md)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
               >
-                <CheckCircle size={18} /> {t('purchases.receive')}
+                <CheckCircle size={16} /> {t('purchases.receive')}
               </button>
             )}
           </div>

@@ -261,7 +261,7 @@ const InventoryList = () => {
   const totalValue = filteredBatches.reduce((acc, curr) => acc + (curr.inventory_value || 0), 0);
 
   return (
-    <div className="page-container">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
       {productId && productSummary && (
         <div style={{ marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -404,28 +404,28 @@ const InventoryList = () => {
         </div>
 
         <div className="card-body" style={{ padding: 0 }}>
-          <div style={{ padding: 'var(--spacing-4)', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 12px', flex: 1, minWidth: '250px' }}>
+          <div style={{ padding: 'var(--spacing-4)', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 12px', flex: 1, minWidth: '220px' }}>
               <Search size={16} color="var(--color-text-muted)" />
               <input 
                 type="text" 
-                placeholder={t('common.search')}
+                placeholder={t('common.search') || (isRtl ? 'البحث في الدفعات أو المنتجات...' : 'Search batches...')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ border: 'none', background: 'transparent', padding: '8px', width: '100%', outline: 'none', fontSize: '0.875rem' }}
+                style={{ border: 'none', background: 'transparent', padding: '8px', width: '100%', outline: 'none', fontSize: '0.875rem', color: 'var(--color-text-primary)' }}
               />
             </div>
             
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', minWidth: '150px' }}>
-              <option value="">{t('common.status')} (All)</option>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', minWidth: '150px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '0.85rem' }}>
+              <option value="">{isRtl ? 'جميع الحالات' : 'All Statuses'}</option>
               <option value="Valid">{t('expiry.valid')}</option>
               <option value="Expiring Soon">{t('expiry.expiringSoon')}</option>
               <option value="Expires Today">{t('expiry.expiresToday')}</option>
               <option value="Expired">{t('expiry.expired')}</option>
             </select>
 
-            <select value={warehouseFilter} onChange={(e) => handleWarehouseFilterChange(e.target.value)} style={{ padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', minWidth: '150px' }}>
-              <option value="">{t('warehouses.title')} (All)</option>
+            <select value={warehouseFilter} onChange={(e) => handleWarehouseFilterChange(e.target.value)} style={{ padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', minWidth: '160px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '0.85rem' }}>
+              <option value="">{isRtl ? 'جميع المستودعات' : 'All Warehouses'}</option>
               {warehouses.map(w => (
                 <option key={w.id} value={w.id}>{w.name}</option>
               ))}
@@ -433,20 +433,20 @@ const InventoryList = () => {
           </div>
 
           <div className="table-responsive">
-            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
+            <table className="table" style={{ width: '100%', minWidth: '1150px', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
-                  {!productId && <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.code')}</th>}
-                  {!productId && <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('products.name')}</th>}
-                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.batchNumber')}</th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('warehouses.title')}</th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{isRtl ? 'المتبقي' : 'Remaining'}</th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.cost')}</th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.productionDate')}</th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.expiryDate')}</th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.daysRemaining')}</th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.inventoryValue')}</th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.status')}</th>
+                  {!productId && <th style={{ padding: '10px 14px', width: '130px', minWidth: '130px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.code')}</th>}
+                  {!productId && <th style={{ padding: '10px 14px', minWidth: '240px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('products.name')}</th>}
+                  <th style={{ padding: '10px 14px', width: '130px', minWidth: '130px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.batchNumber')}</th>
+                  <th style={{ padding: '10px 14px', minWidth: '160px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{t('warehouses.title')}</th>
+                  <th style={{ padding: '10px 14px', width: '90px', minWidth: '90px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{isRtl ? 'المتبقي' : 'Remaining'}</th>
+                  <th style={{ padding: '10px 14px', width: '110px', minWidth: '110px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.cost')}</th>
+                  <th style={{ padding: '10px 14px', width: '110px', minWidth: '110px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.productionDate')}</th>
+                  <th style={{ padding: '10px 14px', width: '120px', minWidth: '120px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.expiryDate')}</th>
+                  <th style={{ padding: '10px 14px', width: '110px', minWidth: '110px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.daysRemaining')}</th>
+                  <th style={{ padding: '10px 14px', width: '120px', minWidth: '120px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.inventoryValue')}</th>
+                  <th style={{ padding: '10px 14px', width: '110px', minWidth: '110px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.status')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -496,7 +496,7 @@ const InventoryList = () => {
                         </td>
                       )}
                       {!productId && (
-                        <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                        <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)', minWidth: '240px', lineHeight: '1.4' }}>
                           {batch.product_name}
                         </td>
                       )}
@@ -513,7 +513,7 @@ const InventoryList = () => {
                           {batch.batch_number}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                      <td style={{ padding: '10px 14px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Building2 size={14} color="var(--color-text-muted)"/>
                           <span>{batch.warehouse_name}</span>

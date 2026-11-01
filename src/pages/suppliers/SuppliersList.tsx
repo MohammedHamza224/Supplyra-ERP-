@@ -297,7 +297,7 @@ const SuppliersList = () => {
         )}
 
         <div className="table-responsive">
-          <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
+          <table className="table" style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left' }}>
                 <th style={{ padding: '10px 14px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('suppliers.name')}</th>
@@ -483,23 +483,50 @@ const SuppliersList = () => {
       
       {/* Compact Add/Edit Supplier Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '12px' }} onMouseDown={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
-          <div className="card" style={{ width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', margin: 0, display: 'flex', flexDirection: 'column' }}>
-            <div className="card-header" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)' }}>
+        <div 
+          style={{ 
+            position: 'fixed', 
+            inset: 0, 
+            backgroundColor: 'rgba(0, 0, 0, 0.55)', 
+            display: 'flex', 
+            alignItems: 'flex-start', 
+            justifyContent: 'center', 
+            zIndex: 1000, 
+            padding: '24px 16px',
+            overflowY: 'auto'
+          }} 
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+        >
+          <div 
+            className="card" 
+            style={{ 
+              width: '100%', 
+              maxWidth: '620px', 
+              maxHeight: 'calc(100vh - 48px)', 
+              margin: 'auto 0', 
+              display: 'flex', 
+              flexDirection: 'column',
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+              overflow: 'hidden'
+            }}
+          >
+            <div className="card-header" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', flexShrink: 0, backgroundColor: 'var(--color-surface)' }}>
               <div>
-                <h2 style={{ fontSize: '1.05rem', margin: 0 }}>
-                  {editingId ? t('common.edit') : t('suppliers.newSupplier')}
+                <h2 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700 }}>
+                  {editingId ? (language === 'ar' ? 'تعديل بيانات المورد' : 'Edit Supplier') : t('suppliers.newSupplier')}
                 </h2>
               </div>
-              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '4px' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '6px', minHeight: '32px', minWidth: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column' }}>
-              <div className="card-body" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div className="card-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', flex: 1 }}>
                 {formError && (
-                  <div style={{ padding: '8px 12px', backgroundColor: 'var(--color-danger-light)', color: 'var(--color-danger)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem' }}>
+                  <div style={{ padding: '10px 14px', backgroundColor: 'var(--color-danger-light)', color: 'var(--color-danger)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem' }}>
                     {formError}
                   </div>
                 )}
@@ -573,9 +600,9 @@ const SuppliersList = () => {
                 )}
 
               </div>
-              <div className="card-footer" style={{ padding: '10px 14px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--color-border)' }}>
-                <button type="button" className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '0.875rem' }} onClick={closeModal} disabled={saving}>{t('common.cancel')}</button>
-                <button type="submit" className="btn btn-primary" style={{ padding: '5px 12px', fontSize: '0.875rem' }} disabled={saving}>{saving ? t('common.loading') : t('common.save')}</button>
+              <div className="card-footer" style={{ padding: '12px 18px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--color-border)', flexShrink: 0, backgroundColor: 'var(--color-background)' }}>
+                <button type="button" className="btn btn-secondary" style={{ padding: '6px 16px', fontSize: '0.875rem' }} onClick={closeModal} disabled={saving}>{t('common.cancel')}</button>
+                <button type="submit" className="btn btn-primary" style={{ padding: '6px 18px', fontSize: '0.875rem', fontWeight: 600 }} disabled={saving}>{saving ? t('common.loading') : t('common.save')}</button>
               </div>
             </form>
           </div>
