@@ -672,3 +672,81 @@ html, body, #root, .app-container {
     display: none !important;
   }
 }
+
+/* ============================================================================
+   GLOBAL ENTERPRISE PRINT CSS STYLESHEET (@media print)
+   ============================================================================ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 10mm 12mm 10mm;
+  }
+
+  /* Reset base colors and backgrounds */
+  html, body, #root, .app-container, .main-content {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide navigation, sidebars, interactive controls & floating elements */
+  aside,
+  nav,
+  header,
+  .no-print,
+  .app-sidebar,
+  .sidebar,
+  .app-topbar,
+  .topbar,
+  .hamburger-btn,
+  .btn:not(.print-keep),
+  button:not(.print-keep),
+  input:not(.print-keep),
+  select:not(.print-keep),
+  .search-box,
+  .pagination,
+  .paginationContainer,
+  .actions-cell,
+  .toast,
+  .modal-overlay:not(.print-active-modal) {
+    display: none !important;
+  }
+
+  /* Avoid awkward page cuts in table rows, cards & summary sections */
+  tr,
+  .card,
+  .table-row,
+  .summary-section,
+  .signatures-block,
+  .terms-box {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Repeating table headers & footers across multi-page prints */
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  /* Ensure tables use 100% available printable width */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Clean up links so URLs are not printed as text */
+  a[href]:after {
+    content: none !important;
+  }
+}

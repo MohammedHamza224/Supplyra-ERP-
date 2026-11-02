@@ -4,6 +4,7 @@ import { X, CheckCircle, XCircle, ShoppingCart, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { printPurchaseInvoice } from '../../utils/printPurchaseInvoice';
+import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
 
 interface PurchaseDetailsProps {
   purchaseId: string;
@@ -21,6 +22,7 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   useEffect(() => {
     fetchPurchaseData();
@@ -320,11 +322,11 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button 
-              onClick={() => printPurchaseInvoice(purchase, items, language, 'SUPPLYRA')}
+              onClick={() => setIsPrintModalOpen(true)}
               type="button"
               style={{ padding: '8px 16px', border: '1px solid var(--color-primary)', backgroundColor: 'var(--color-surface)', color: 'var(--color-primary)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
             >
-              <Printer size={16} /> {language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
+              <Printer size={16} /> {language === 'ar' ? 'معاينة وطباعة الفاتورة' : 'Print Invoice'}
             </button>
 
             {purchase?.status !== 'CANCELLED' && hasPermission('purchases.cancel') && (
@@ -347,6 +349,40 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
           </div>
         </div>
       </div>
+
+      {isPrintModalOpen && purchase && (
+        <DocumentPrintModal
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          data={{
+            type: purchase.status === 'RECEIVED' ? 'PURCHASE_INVOICE' : purchase.status === 'RETURNED' ? 'DEBIT_NOTE' : 'PURCHASE_ORDER',
+            invoiceNumber: purchase.invoice_number || purchase.purchase_number || `#${purchase.id?.slice(0, 8).toUpperCase()}`,
+            date: purchase.purchase_date || purchase.created_at,
+            supplyDate: purchase.expected_delivery_date || purchase.purchase_date,
+            entityName: purchase.supplier?.name || (isRtl ? 'مورد غير محدد' : 'Not Specified'),
+            entityPhone: purchase.supplier?.phone,
+            entityAddress: purchase.supplier?.address,
+            entityTaxNumber: purchase.supplier?.tax_number,
+            warehouseName: purchase.warehouse?.name,
+            status: purchase.status,
+            notes: purchase.notes,
+            subtotal: grandTotal,
+            discount: Number(purchase.discount_amount || purchase.discount || 0),
+            tax: Number(purchase.tax_amount || purchase.tax || 0),
+            grandTotal: grandTotal,
+            items: items.map(item => ({
+              productName: item.product?.name || item.product_name || (isRtl ? 'صنف غير محدد' : 'General Item'),
+              productCode: item.product?.product_code || item.product?.code || '-',
+              quantity: Number(item.quantity || 0),
+              unitCode: item.unit?.code || item.unit?.name || (isRtl ? 'وحدة' : 'Unit'),
+              price: Number(item.purchase_price || 0),
+              discount: Number(item.discount || 0),
+              taxAmount: Number(item.tax || 0),
+              total: Number(item.total || (Number(item.quantity || 0) * Number(item.purchase_price || 0)))
+            }))
+          }}
+        />
+      )}
     </div>
   );
 };

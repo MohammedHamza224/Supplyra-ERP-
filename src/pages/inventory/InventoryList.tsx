@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Search, Plus, Edit2, AlertTriangle, CircleCheck, Calendar, Clock, Package, Building2, X } from 'lucide-react';
+import { Search, Plus, Edit2, AlertTriangle, CircleCheck, Calendar, Clock, Package, Building2, X, Printer } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDebounce } from '../../hooks/useDebounce';
+import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
 
 interface InventoryBatch {
   id: string;
@@ -315,6 +316,34 @@ const InventoryList = () => {
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const paginatedBatches = filteredBatches.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  const [printReportData, setPrintReportData] = useState<any>(null);
+
+  const handlePrintStockReport = () => {
+    const items = filteredBatches.map(b => {
+      const cost = Number(b.purchase_price || 0);
+      const qty = Number(b.quantity || 0);
+      return {
+        productName: `${b.product_name || (isRtl ? 'منتج غير محدد' : 'Unknown Product')} (دفعة: ${b.batch_number || '-'})`,
+        productCode: b.product_code || '-',
+        quantity: qty,
+        unitCode: isRtl ? 'وحدة' : 'Unit',
+        price: cost,
+        total: cost * qty
+      };
+    });
+
+    setPrintReportData({
+      type: 'STOCK_REPORT',
+      invoiceNumber: `STOCK-REP-${new Date().toISOString().slice(0, 10)}`,
+      date: new Date().toISOString(),
+      entityName: warehouseFilter ? (warehouses.find(w => w.id === warehouseFilter)?.name || (isRtl ? 'مستودع محدد' : 'Selected Warehouse')) : (isRtl ? 'كافة المستودعات والفروع' : 'All Warehouses'),
+      subtotal: totalValue,
+      grandTotal: totalValue,
+      notes: isRtl ? `تقرير جرد وتقييم مخزني شامل - إجمالي كمية الوحدات: ${totalStock.toLocaleString()} وحدة عبر ${filteredBatches.length} دفعة` : `Certified Inventory Valuation Report - Total Stock: ${totalStock} units across ${filteredBatches.length} batches`,
+      items: items
+    });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
       {productId && productSummary && (
@@ -446,16 +475,28 @@ const InventoryList = () => {
               </p>
             </div>
           </div>
-          {productId && hasPermission('inventory.create') && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
-              className="btn btn-primary"
-              onClick={() => setShowModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              type="button"
+              onClick={handlePrintStockReport}
+              className="btn btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+              title={isRtl ? 'طباعة تقرير جرد المخزون' : 'Print Stock Valuation Report'}
             >
-              <Plus size={18} />
-              {t('inventory.addStock')}
+              <Printer size={16} />
+              <span>{isRtl ? 'طباعة تقرير المخزون' : 'Print Stock Report'}</span>
             </button>
-          )}
+            {productId && hasPermission('inventory.create') && (
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Plus size={18} />
+                {t('inventory.addStock')}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="card-body" style={{ padding: 0 }}>
@@ -918,6 +959,14 @@ const InventoryList = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {printReportData && (
+        <DocumentPrintModal
+          isOpen={Boolean(printReportData)}
+          onClose={() => setPrintReportData(null)}
+          data={printReportData}
+        />
       )}
     </div>
   );

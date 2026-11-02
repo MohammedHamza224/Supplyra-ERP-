@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { Plus, Edit2, Trash2, Search, X, Truck } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, Truck, Printer } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
 import SupplierProducts from './SupplierProducts';
+import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
 
 const SuppliersList = () => {
   const { t, language } = useTranslation();
@@ -22,6 +23,48 @@ const SuppliersList = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteErrorMsg, setDeleteErrorMsg] = useState('');
+  const [statementPrintData, setStatementPrintData] = useState<any>(null);
+
+  const handlePrintSupplierStatement = async (supplier: any) => {
+    try {
+      const { data: purchases } = await supabase
+        .from('purchases')
+        .select('*')
+        .eq('supplier_id', supplier.id)
+        .order('created_at', { ascending: false })
+        .limit(25);
+
+      const items = (purchases || []).map((p: any) => ({
+        productName: `${isRtl ? 'فاتورة مشتريات' : 'Purchase Invoice'} #${p.purchase_number || p.invoice_number || p.id?.slice(0, 8)}`,
+        productCode: p.purchase_number || '-',
+        quantity: 1,
+        unitCode: isRtl ? 'فاتورة' : 'Inv',
+        price: Number(p.total_amount || p.grand_total || p.subtotal || 0),
+        total: Number(p.total_amount || p.grand_total || p.subtotal || 0)
+      }));
+
+      const totalSpent = items.reduce((s: number, it: any) => s + it.total, 0);
+
+      setStatementPrintData({
+        type: 'ACCOUNT_STATEMENT',
+        invoiceNumber: `STMT-SUPP-${supplier.id?.slice(0, 6).toUpperCase()}`,
+        date: new Date().toISOString(),
+        entityName: supplier.name,
+        entityPhone: supplier.phone,
+        entityAddress: supplier.address,
+        entityTaxNumber: supplier.tax_number,
+        subtotal: totalSpent,
+        tax: 0,
+        grandTotal: totalSpent,
+        notes: isRtl 
+          ? `كشف حساب مورد رسمي ومعتمد - إجمالي التعاملات: ${totalSpent.toLocaleString()} ر.س (عدد الفواتير: ${items.length})` 
+          : `Official Supplier Statement of Account - Total Purchases: ${totalSpent.toLocaleString()} SAR (${items.length} invoices)`,
+        items: items
+      });
+    } catch (err) {
+      console.error('Failed to generate supplier statement:', err);
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: '',
@@ -398,6 +441,26 @@ const SuppliersList = () => {
                         flexWrap: 'nowrap',
                         verticalAlign: 'middle'
                       }}>
+                        <button 
+                          type="button"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                            color: 'var(--color-primary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onClick={() => handlePrintSupplierStatement(supplier)}
+                          title={language === 'ar' ? 'طباعة كشف حساب المورد' : 'Print Statement of Account'}
+                        >
+                          <Printer size={15} />
+                        </button>
                         {hasPermission('suppliers.update') && (
                           <button 
                             type="button"
@@ -607,6 +670,14 @@ const SuppliersList = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {statementPrintData && (
+        <DocumentPrintModal
+          isOpen={Boolean(statementPrintData)}
+          onClose={() => setStatementPrintData(null)}
+          data={statementPrintData}
+        />
       )}
     </div>
   );

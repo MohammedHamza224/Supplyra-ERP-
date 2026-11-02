@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDebounce } from '../../hooks/useDebounce';
 import SaleDetails from '../sales/SaleDetails';
+import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
 import styles from './Dashboard.module.css';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -440,6 +441,34 @@ const Dashboard = () => {
     }).format(val);
   };
 
+  const [dashboardPrintData, setDashboardPrintData] = useState<any>(null);
+
+  const handlePrintDashboard = () => {
+    const periodLabel = getDateFilterLabel(filter);
+    const items = filteredOrders.slice(0, 30).map(o => ({
+      productName: `${isRtl ? 'طلب مبيعات' : 'Sales Order'} #${o.order_number || o.id?.slice(0, 8)} (${o.customer?.name || (isRtl ? 'عميل نقدي' : 'Cash')})`,
+      productCode: o.order_number || '-',
+      quantity: 1,
+      unitCode: isRtl ? 'عملية' : 'Txn',
+      price: Number(o.grand_total || o.total_amount || 0),
+      total: Number(o.grand_total || o.total_amount || 0)
+    }));
+
+    setDashboardPrintData({
+      type: 'ACCOUNT_STATEMENT',
+      invoiceNumber: `EXEC-STAT-${new Date().toISOString().slice(0, 10)}`,
+      date: new Date().toISOString(),
+      entityName: isRtl ? 'الإدارة التنفيذية والشركاء' : 'Executive Management',
+      subtotal: stats.totalSales,
+      tax: 0,
+      grandTotal: stats.totalSales,
+      notes: isRtl 
+        ? `تقرير الأداء المالي والتنفيذي للفترة: ${periodLabel} • إجمالي المبيعات: ${stats.totalSales.toLocaleString()} ر.س • إجمالي المشتريات: ${stats.totalPurchases.toLocaleString()} ر.س • إجمالي أرباح التوزيع: ${stats.grossProfit.toLocaleString()} ر.س • عدد الطلبات: ${stats.totalOrders}`
+        : `Executive Performance Report (${periodLabel}) • Sales: ${stats.totalSales} SAR • Purchases: ${stats.totalPurchases} SAR • Profit: ${stats.grossProfit} SAR • Orders: ${stats.totalOrders}`,
+      items: items
+    });
+  };
+
   return (
     <div className={styles.container}>
       
@@ -473,12 +502,12 @@ const Dashboard = () => {
           <button 
             type="button"
             className="btn btn-secondary" 
-            onClick={() => window.print()}
-            title={language === 'ar' ? 'طباعة ملخص اللوحة' : 'Print Summary'}
+            onClick={handlePrintDashboard}
+            title={language === 'ar' ? 'طباعة تقرير التحليل المالي' : 'Print Financial Summary'}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', minHeight: '38px', padding: '0 14px' }}
           >
             <Printer size={15} />
-            <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+            <span>{language === 'ar' ? 'طباعة التقرير' : 'Print'}</span>
           </button>
         </div>
       </div>
@@ -1251,6 +1280,15 @@ const Dashboard = () => {
           saleId={viewingSaleId} 
           onClose={() => setViewingSaleId(null)} 
           onUpdate={fetchStats} 
+        />
+      )}
+
+      {/* Executive Financial Report Print Modal */}
+      {dashboardPrintData && (
+        <DocumentPrintModal
+          isOpen={Boolean(dashboardPrintData)}
+          onClose={() => setDashboardPrintData(null)}
+          data={dashboardPrintData}
         />
       )}
 

@@ -9,6 +9,7 @@ import {
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area, Cell, LineChart, Line
 } from 'recharts';
+import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
 
 type DateFilter = 'today' | 'week' | 'month' | 'year' | 'custom' | 'all';
 
@@ -403,92 +404,31 @@ export default function AnalyticsDashboard() {
     );
   }
 
+  const [printModalData, setPrintModalData] = useState<any>(null);
+
   const handlePrintAnalytics = () => {
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
+    const items = topProducts.map(p => ({
+      productName: p.name,
+      categoryName: p.category,
+      quantity: Number(p.qty || 0),
+      unitCode: isRtl ? 'وحدة' : 'Unit',
+      price: p.qty > 0 ? (p.revenue / p.qty) : 0,
+      total: Number(p.revenue || 0)
+    }));
 
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-
-    const html = `
-      <!DOCTYPE html>
-      <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${isRtl ? 'ar' : 'en'}">
-        <head>
-          <meta charset="utf-8" />
-          <title>${isRtl ? 'تقرير تحليلات الأعمال' : 'Analytics Report'} - ${dateFilter.toUpperCase()}</title>
-          <style>
-            @media print { @page { margin: 10mm; size: A4 portrait; } }
-            * { box-sizing: border-box; }
-            body { font-family: ${isRtl ? "'Segoe UI', Tahoma, sans-serif" : "'Inter', sans-serif"}; padding: 20px; color: #1e293b; line-height: 1.5; background: #fff; }
-            .header { border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 16px; }
-            h1 { color: #047857; font-size: 22px; margin: 0 0 4px 0; }
-            .meta { color: #64748b; font-size: 12px; }
-            .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
-            .kpi-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; }
-            .kpi-title { font-size: 11px; color: #64748b; font-weight: bold; }
-            .kpi-value { font-size: 17px; font-weight: bold; color: #0f172a; margin-top: 2px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
-            th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: ${isRtl ? 'right' : 'left'}; }
-            th { background: #f1f5f9; font-weight: 600; }
-            .section-title { font-size: 14px; font-weight: bold; margin-top: 20px; margin-bottom: 8px; color: #047857; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>SUPPLYRA - ${isRtl ? 'تقرير تحليلات الأعمال' : 'Business Analytics Report'}</h1>
-            <div class="meta">
-              ${isRtl ? 'الفترة الزمنية:' : 'Period:'} <strong>${dateFilter.toUpperCase()}</strong> | 
-              ${isRtl ? 'تاريخ التقرير:' : 'Generated Date:'} ${new Date().toLocaleString(isRtl ? 'ar-EG' : 'en-US')}
-            </div>
-          </div>
-
-          <div class="kpi-grid">
-            <div class="kpi-card"><div class="kpi-title">${isRtl ? 'إجمالي المبيعات' : 'Sales Revenue'}</div><div class="kpi-value">${formatCurrency(kpis.totalSales)}</div></div>
-            <div class="kpi-card"><div class="kpi-title">${isRtl ? 'إجمالي المشتريات' : 'Purchases Cost'}</div><div class="kpi-value">${formatCurrency(kpis.totalPurchases)}</div></div>
-            <div class="kpi-card"><div class="kpi-title">${isRtl ? 'إجمالي الربح' : 'Gross Profit'}</div><div class="kpi-value">${formatCurrency(kpis.grossProfit)} (${kpis.grossMargin.toFixed(1)}%)</div></div>
-            <div class="kpi-card"><div class="kpi-title">${isRtl ? 'إجمالي العملاء' : 'Total Customers'}</div><div class="kpi-value">${kpis.totalCustomers}</div></div>
-            <div class="kpi-card"><div class="kpi-title">${isRtl ? 'إجمالي المنتجات' : 'Total Products'}</div><div class="kpi-value">${kpis.totalProducts}</div></div>
-            <div class="kpi-card"><div class="kpi-title">${isRtl ? 'إجمالي الموردين' : 'Total Suppliers'}</div><div class="kpi-value">${kpis.totalSuppliers}</div></div>
-          </div>
-
-          <div class="section-title">${isRtl ? 'الأكثر مبيعاً' : 'Top Selling Products'}</div>
-          <table>
-            <thead>
-              <tr><th>#</th><th>${isRtl ? 'المنتج' : 'Product'}</th><th>${isRtl ? 'الفئة' : 'Category'}</th><th>${isRtl ? 'الكمية' : 'Qty'}</th><th>${isRtl ? 'الإجمالي' : 'Total'}</th></tr>
-            </thead>
-            <tbody>
-              ${topProducts.map((p, i) => `<tr><td>${i+1}</td><td>${p.name}</td><td>${p.category}</td><td>${p.qty}</td><td>${formatCurrency(p.revenue)}</td></tr>`).join('')}
-            </tbody>
-          </table>
-
-          <div class="section-title">${isRtl ? 'أعلى العملاء مشترياً' : 'Top Customers'}</div>
-          <table>
-            <thead>
-              <tr><th>#</th><th>${isRtl ? 'العميل' : 'Customer'}</th><th>${isRtl ? 'عدد الطلبات' : 'Orders'}</th><th>${isRtl ? 'إجمالي الشراء' : 'Total Spent'}</th></tr>
-            </thead>
-            <tbody>
-              ${topCustomers.map((c, i) => `<tr><td>${i+1}</td><td>${c.name}</td><td>${c.count}</td><td>${formatCurrency(c.totalSpent)}</td></tr>`).join('')}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
-
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 1000);
-    }, 250);
+    setPrintModalData({
+      type: 'ACCOUNT_STATEMENT',
+      invoiceNumber: `ANALYTICS-${dateFilter.toUpperCase()}-${new Date().toISOString().slice(0, 10)}`,
+      date: new Date().toISOString(),
+      entityName: isRtl ? 'تقرير تحليلات الأعمال والربحية' : 'Business Analytics & Profitability',
+      subtotal: kpis.totalSales,
+      tax: 0,
+      grandTotal: kpis.totalSales,
+      notes: isRtl
+        ? `تقرير التحليلات للفترة: ${dateFilter.toUpperCase()} • إجمالي المبيعات: ${kpis.totalSales.toLocaleString()} ر.س • إجمالي المشتريات: ${kpis.totalPurchases.toLocaleString()} ر.س • إجمالي الأرباح: ${kpis.grossProfit.toLocaleString()} ر.س • هامش الربح: ${kpis.grossMargin.toFixed(1)}%`
+        : `Analytics Report for period: ${dateFilter.toUpperCase()} • Total Sales: ${kpis.totalSales} SAR • Purchases: ${kpis.totalPurchases} SAR • Profit: ${kpis.grossProfit} SAR • Margin: ${kpis.grossMargin.toFixed(1)}%`,
+      items: items
+    });
   };
 
   const handleExportExcel = () => {
@@ -887,6 +827,13 @@ export default function AnalyticsDashboard() {
 
       </div>
 
+      {printModalData && (
+        <DocumentPrintModal
+          isOpen={Boolean(printModalData)}
+          onClose={() => setPrintModalData(null)}
+          data={printModalData}
+        />
+      )}
     </div>
   );
 }

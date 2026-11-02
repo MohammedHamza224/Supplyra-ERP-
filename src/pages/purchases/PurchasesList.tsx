@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../../contexts/LanguageContext';
-import { Plus, Search, Eye, Filter, Edit2, FileText, CheckCircle, XCircle, ShoppingBag, Trash2 } from 'lucide-react';
+import { Plus, Search, Eye, Filter, Edit2, FileText, CheckCircle, XCircle, ShoppingBag, Trash2, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import PurchaseForm from './PurchaseForm';
 import PurchaseDetails from './PurchaseDetails';
 import { useDebounce } from '../../hooks/useDebounce';
+import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
 
 const PurchasesList = () => {
   const { t, language } = useTranslation();
@@ -27,6 +28,50 @@ const PurchasesList = () => {
   const [deleteTargetPurchase, setDeleteTargetPurchase] = useState<any>(null);
   const [deleteErrorMsg, setDeleteErrorMsg] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [quickPrintData, setQuickPrintData] = useState<any>(null);
+
+  const handleQuickPrint = async (purchase: any) => {
+    try {
+      let itemsList: any[] = [];
+      const { data } = await supabase
+        .from('purchase_items')
+        .select('*, product:products(name, product_code)')
+        .eq('purchase_id', purchase.id);
+      itemsList = data || [];
+
+      const totalVal = Number(purchase.total_amount || purchase.grand_total || purchase.subtotal || 0);
+
+      setQuickPrintData({
+        type: purchase.status === 'RECEIVED' ? 'PURCHASE_INVOICE' : purchase.status === 'RETURNED' ? 'DEBIT_NOTE' : 'PURCHASE_ORDER',
+        invoiceNumber: purchase.invoice_number || purchase.purchase_number || `#${purchase.id?.slice(0, 8).toUpperCase()}`,
+        date: purchase.purchase_date || purchase.created_at,
+        supplyDate: purchase.expected_delivery_date || purchase.purchase_date,
+        entityName: purchase.supplier?.name || (isRtl ? 'مورد غير محدد' : 'Not Specified'),
+        entityPhone: purchase.supplier?.phone,
+        entityAddress: purchase.supplier?.address,
+        entityTaxNumber: purchase.supplier?.tax_number,
+        warehouseName: purchase.warehouse?.name,
+        status: purchase.status,
+        notes: purchase.notes,
+        subtotal: totalVal,
+        discount: Number(purchase.discount_amount || purchase.discount || 0),
+        tax: Number(purchase.tax_amount || purchase.tax || 0),
+        grandTotal: totalVal,
+        items: itemsList.map((item: any) => ({
+          productName: item.product?.name || item.product_name || (isRtl ? 'صنف غير محدد' : 'General Item'),
+          productCode: item.product?.product_code || item.product?.code || '-',
+          quantity: Number(item.quantity || 0),
+          unitCode: isRtl ? 'وحدة' : 'Unit',
+          price: Number(item.purchase_price || 0),
+          discount: Number(item.discount || 0),
+          taxAmount: Number(item.tax || 0),
+          total: Number(item.total || (Number(item.quantity || 0) * Number(item.purchase_price || 0)))
+        }))
+      });
+    } catch (err) {
+      console.error('Failed to load purchase items for printing:', err);
+    }
+  };
 
   const fetchPurchases = async () => {
     try {
@@ -272,6 +317,26 @@ const PurchasesList = () => {
                           >
                             <Eye size={15} />
                           </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleQuickPrint(purchase)}
+                            title={language === 'ar' ? 'طباعة الفاتورة فورياً' : 'Quick Print Invoice'}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              backgroundColor: 'var(--color-surface)',
+                              color: 'var(--color-primary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <Printer size={15} />
+                          </button>
                           {hasPermission('purchases.update') && (
                             <button 
                               type="button"
@@ -375,6 +440,14 @@ const PurchasesList = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {quickPrintData && (
+        <DocumentPrintModal
+          isOpen={Boolean(quickPrintData)}
+          onClose={() => setQuickPrintData(null)}
+          data={quickPrintData}
+        />
       )}
     </div>
   );

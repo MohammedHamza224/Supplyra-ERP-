@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase';
 import { printInvoice } from '../../utils/printInvoice';
 import { useAuth } from '../../contexts/AuthContext';
 import DiscountApprovalModal from './DiscountApprovalModal';
+import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
+import type { InvoiceData } from '../../utils/printInvoiceEngine';
 
 interface SaleDetailsProps {
   saleId: string;
@@ -21,6 +23,7 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [error, setError] = useState('');
   
   const [sale, setSale] = useState<any>(null);
@@ -303,9 +306,9 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button 
-              onClick={() => printInvoice(sale, items, 'SUPPLYRA', '', language)} 
+              onClick={() => setIsPrintModalOpen(true)} 
               className="btn btn-secondary" 
-              title={isRtl ? 'طباعة الفاتورة' : 'Print Invoice'}
+              title={isRtl ? 'معاينة وطباعة الفاتورة' : 'Print Invoice'}
               style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', minHeight: '38px', color: 'var(--color-primary)', fontSize: '0.85rem' }}
             >
               <Printer size={16} />
@@ -592,12 +595,12 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
           
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button 
-              onClick={() => printInvoice(sale, items, 'SUPPLYRA', '', language)}
+              onClick={() => setIsPrintModalOpen(true)}
               className="btn btn-secondary"
               style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', padding: '8px 14px', minHeight: '38px' }}
             >
               <Printer size={16} />
-              {isRtl ? 'طباعة الفاتورة' : 'Print Invoice'}
+              {isRtl ? 'معاينة وطباعة الفاتورة' : 'Print Invoice'}
             </button>
             <button
               onClick={onClose}
@@ -610,6 +613,44 @@ const SaleDetails: React.FC<SaleDetailsProps> = ({ saleId, isOpen, onClose, onUp
         </div>
 
       </div>
+
+      {isPrintModalOpen && sale && (
+        <DocumentPrintModal
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          data={{
+            type: sale.status === 'DRAFT' ? 'QUOTATION' : sale.status === 'RETURNED' ? 'CREDIT_NOTE' : 'TAX_INVOICE',
+            invoiceNumber: sale.order_number || sale.invoice_number || `#${sale.id?.slice(0, 8).toUpperCase()}`,
+            date: sale.order_date || sale.created_at,
+            supplyDate: sale.supply_date || sale.order_date || sale.created_at,
+            entityName: sale.customer?.name || (isRtl ? 'عميل نقدي' : 'Cash Customer'),
+            entityPhone: sale.customer?.mobile || sale.customer?.phone,
+            entityAddress: sale.customer?.address,
+            entityTaxNumber: sale.customer?.tax_number,
+            warehouseName: sale.warehouse?.name,
+            paymentMethod: sale.payment_method === 'cash' ? (isRtl ? 'نقدي' : 'Cash') : (isRtl ? 'شبكة / بطاقة' : 'Card'),
+            status: sale.status,
+            creatorName: sale.created_by_name || sale.creator?.name,
+            notes: sale.notes,
+            subtotal: Number(sale.subtotal || items.reduce((s, i) => s + (Number(i.total || i.total_price) || 0), 0)),
+            discount: Number(sale.discount || 0),
+            tax: Number(sale.tax || sale.tax_amount || 0),
+            grandTotal: Number(sale.grand_total || sale.total_amount || 0),
+            items: items.map(item => ({
+              productName: item.product?.name || item.product_name || (isRtl ? 'صنف غير محدد' : 'General Item'),
+              productCode: item.product?.product_code || item.product?.code || '-',
+              categoryName: item.product?.category?.name,
+              subcategoryName: item.product?.brand?.name,
+              quantity: Number(item.quantity || 0),
+              unitCode: item.unit?.code || item.unit?.name || (isRtl ? 'وحدة' : 'Unit'),
+              price: Number(item.selling_price || item.unit_price || item.price || 0),
+              discount: Number(item.discount || 0),
+              taxAmount: Number(item.tax || 0),
+              total: Number(item.total || item.total_price || 0)
+            }))
+          }}
+        />
+      )}
 
       {isApprovalModalOpen && saleId && (
         <DiscountApprovalModal

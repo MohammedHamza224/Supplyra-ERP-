@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { Plus, Edit2, Trash2, Search, MapPin, X, Users, CheckCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, MapPin, X, Users, CheckCircle, Printer } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
+import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
 
 const CustomersList = () => {
   const { t, language } = useTranslation();
@@ -24,6 +25,48 @@ const CustomersList = () => {
   const [deleteCustomerTarget, setDeleteCustomerTarget] = useState<any | null>(null);
   const [deleteErrorMsg, setDeleteErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [statementPrintData, setStatementPrintData] = useState<any>(null);
+
+  const handlePrintStatement = async (cust: any) => {
+    try {
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_id', cust.id)
+        .order('created_at', { ascending: false })
+        .limit(25);
+
+      const items = (orders || []).map((o: any) => ({
+        productName: `${isRtl ? 'فاتورة مبيعات' : 'Sales Invoice'} #${o.order_number || o.id?.slice(0, 8)}`,
+        productCode: o.order_number || '-',
+        quantity: 1,
+        unitCode: isRtl ? 'فاتورة' : 'Inv',
+        price: Number(o.grand_total || o.total_amount || 0),
+        total: Number(o.grand_total || o.total_amount || 0)
+      }));
+
+      const totalSpent = items.reduce((s: number, it: any) => s + it.total, 0);
+
+      setStatementPrintData({
+        type: 'ACCOUNT_STATEMENT',
+        invoiceNumber: `STMT-CUST-${cust.id?.slice(0, 6).toUpperCase()}`,
+        date: new Date().toISOString(),
+        entityName: cust.name,
+        entityPhone: cust.phone || cust.mobile,
+        entityAddress: cust.address,
+        entityTaxNumber: cust.tax_number,
+        subtotal: totalSpent,
+        tax: 0,
+        grandTotal: totalSpent,
+        notes: isRtl 
+          ? `كشف حساب عميل رسمي ومعتمد - إجمالي قيمة الفواتير: ${totalSpent.toLocaleString()} ر.س (عدد العمليات: ${items.length})` 
+          : `Official Statement of Account - Total Spent: ${totalSpent.toLocaleString()} SAR (${items.length} invoices)`,
+        items: items
+      });
+    } catch (err) {
+      console.error('Failed to generate customer statement:', err);
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: '',
@@ -516,6 +559,26 @@ const CustomersList = () => {
                         flexWrap: 'nowrap',
                         verticalAlign: 'middle'
                       }}>
+                        <button 
+                          type="button"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                            color: 'var(--color-primary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onClick={() => handlePrintStatement(customer)}
+                          title={language === 'ar' ? 'طباعة كشف الحساب' : 'Print Statement of Account'}
+                        >
+                          <Printer size={15} />
+                        </button>
                         {hasPermission('customers.update') && (
                           <button 
                             type="button"
@@ -674,6 +737,14 @@ const CustomersList = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {statementPrintData && (
+        <DocumentPrintModal
+          isOpen={Boolean(statementPrintData)}
+          onClose={() => setStatementPrintData(null)}
+          data={statementPrintData}
+        />
       )}
     </div>
   );

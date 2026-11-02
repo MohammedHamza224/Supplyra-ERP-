@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../../contexts/LanguageContext';
-import { Plus, Search, Eye, Edit2, Filter, BarChart2, List, ShieldCheck, ShoppingCart, Trash2 } from 'lucide-react';
+import { Plus, Search, Eye, Edit2, Filter, BarChart2, List, ShieldCheck, ShoppingCart, Trash2, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import SalesForm from './SalesForm';
@@ -9,6 +9,7 @@ import SaleDetails from './SaleDetails';
 import SalesAnalytics from './SalesAnalytics';
 import DiscountApprovalModal from './DiscountApprovalModal';
 import { useDebounce } from '../../hooks/useDebounce';
+import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
 
 const SalesList = () => {
   const { t, language } = useTranslation();
@@ -40,6 +41,50 @@ const SalesList = () => {
   const [deleteTargetSale, setDeleteTargetSale] = useState<any>(null);
   const [deleteErrorMsg, setDeleteErrorMsg] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [quickPrintData, setQuickPrintData] = useState<any>(null);
+
+  const handleQuickPrint = async (sale: any) => {
+    try {
+      let saleItems: any[] = [];
+      const { data } = await supabase
+        .from('order_items')
+        .select('*, product:products(name, product_code)')
+        .eq('order_id', sale.id);
+      saleItems = data || [];
+
+      setQuickPrintData({
+        type: sale.status === 'DRAFT' ? 'QUOTATION' : sale.status === 'RETURNED' ? 'CREDIT_NOTE' : 'TAX_INVOICE',
+        invoiceNumber: sale.order_number || sale.invoice_number || `#${sale.id?.slice(0, 8).toUpperCase()}`,
+        date: sale.order_date || sale.created_at,
+        supplyDate: sale.supply_date || sale.order_date || sale.created_at,
+        entityName: sale.customer?.name || (isRtl ? 'عميل نقدي' : 'Cash Customer'),
+        entityPhone: sale.customer?.mobile || sale.customer?.phone,
+        entityAddress: sale.customer?.address,
+        entityTaxNumber: sale.customer?.tax_number,
+        warehouseName: sale.warehouse?.name,
+        paymentMethod: sale.payment_method === 'cash' ? (isRtl ? 'نقدي' : 'Cash') : (isRtl ? 'شبكة / بطاقة' : 'Card'),
+        status: sale.status,
+        creatorName: sale.created_by_name,
+        notes: sale.notes,
+        subtotal: Number(sale.subtotal || sale.total_amount || 0),
+        discount: Number(sale.discount || 0),
+        tax: Number(sale.tax || sale.tax_amount || 0),
+        grandTotal: Number(sale.grand_total || sale.total_amount || 0),
+        items: saleItems.map((item: any) => ({
+          productName: item.product?.name || item.product_name || (isRtl ? 'صنف غير محدد' : 'General Item'),
+          productCode: item.product?.product_code || item.product?.code || '-',
+          quantity: Number(item.quantity || 0),
+          unitCode: isRtl ? 'وحدة' : 'Unit',
+          price: Number(item.unit_price || item.price || 0),
+          discount: Number(item.discount || 0),
+          taxAmount: Number(item.tax || 0),
+          total: Number(item.total_price || item.total || 0)
+        }))
+      });
+    } catch (err) {
+      console.error('Failed to load items for printing:', err);
+    }
+  };
 
   const fetchSales = async () => {
     try {
@@ -472,6 +517,26 @@ const SalesList = () => {
                               >
                                 <Eye size={15} />
                               </button>
+                              <button 
+                                type="button"
+                                onClick={() => handleQuickPrint(sale)}
+                                title={language === 'ar' ? 'طباعة الفاتورة فورياً' : 'Quick Print Invoice'}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '6px',
+                                  border: '1px solid var(--color-border)',
+                                  backgroundColor: 'var(--color-surface)',
+                                  color: 'var(--color-primary)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Printer size={15} />
+                              </button>
                               {hasPermission('sales.update') && (
                                 <button 
                                   type="button"
@@ -586,6 +651,14 @@ const SalesList = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {quickPrintData && (
+        <DocumentPrintModal
+          isOpen={Boolean(quickPrintData)}
+          onClose={() => setQuickPrintData(null)}
+          data={quickPrintData}
+        />
       )}
     </div>
   );
