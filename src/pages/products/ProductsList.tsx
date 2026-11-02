@@ -446,15 +446,14 @@ if (
               throw new Error(`Batch data is incomplete. Warehouse: "${formData.warehouse_id}", Batch: "${formData.batch_number}", Expiry: "${formData.expiry_date}", Qty: "${formData.initial_quantity}"`);
             }
             
-            // Insert batch
+            // Insert batch (defensive schema: inventory_batches does not have active column)
             const { data: batchData, error: batchError } = await supabase.from('inventory_batches').insert([{
               product_id: newProduct.id,
               warehouse_id: formData.warehouse_id,
               batch_number: formData.batch_number,
               production_date: formData.production_date || null,
               expiry_date: formData.expiry_date,
-              quantity: Number(formData.initial_quantity),
-              active: true
+              quantity: Number(formData.initial_quantity)
             }]).select();
             
             if (batchError) {

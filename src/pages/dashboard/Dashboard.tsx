@@ -418,7 +418,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchStats();
-  }, [filter]);
+  }, [filter, customFrom, customTo]);
 
   // Real-time In-memory Filtered Orders for the Analysis Table
   const filteredOrders = useMemo(() => {

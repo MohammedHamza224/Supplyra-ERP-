@@ -550,9 +550,10 @@ const SuppliersList = () => {
           style={{ 
             position: 'fixed', 
             inset: 0, 
-            backgroundColor: 'rgba(0, 0, 0, 0.55)', 
+            backgroundColor: 'rgba(0, 0, 0, 0.65)', 
+            backdropFilter: 'blur(3px)',
             display: 'flex', 
-            alignItems: 'flex-start', 
+            alignItems: 'center', 
             justifyContent: 'center', 
             zIndex: 1000, 
             padding: '24px 16px',
@@ -564,15 +565,16 @@ const SuppliersList = () => {
             className="card" 
             style={{ 
               width: '100%', 
-              maxWidth: '620px', 
-              maxHeight: 'calc(100vh - 48px)', 
-              margin: 'auto 0', 
+              maxWidth: '740px', 
+              maxHeight: 'min(90vh, 820px)', 
+              margin: 'auto', 
               display: 'flex', 
               flexDirection: 'column',
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-lg)',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
-              overflow: 'hidden'
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              overflow: 'hidden',
+              border: '1px solid var(--color-border)'
             }}
           >
             <div className="card-header" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', flexShrink: 0, backgroundColor: 'var(--color-surface)' }}>

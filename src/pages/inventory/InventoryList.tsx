@@ -140,24 +140,31 @@ const InventoryList = () => {
       }
       
       const formattedData = (data || []).map((b: any) => {
-        const [yyyy, mm, dd] = b.expiry_date.split('-');
-        const expDate = new Date(Number(yyyy), Number(mm) - 1, Number(dd), 0, 0, 0, 0);
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const diffTime = expDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        let diffDays = 0;
+        let expDate = new Date();
+        const expStr = b.expiry_date ? String(b.expiry_date).split('T')[0] : '';
+        if (expStr) {
+          const parts = expStr.split('-').map(Number);
+          if (parts.length === 3) {
+            expDate = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const diffTime = expDate.getTime() - today.getTime();
+            diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          }
+        }
         
         let status = 'Valid';
         if (diffDays < 0) status = 'Expired';
         else if (diffDays === 0) status = 'Expires Today';
         else if (diffDays <= 30) status = 'Expiring Soon';
 
-        const qty = Number(b.quantity);
+        const qty = Number(b.quantity || 0);
         const cost = Number(b.products?.purchase_price || 0);
 
         // Derive sensible production date if not already set in DB
-        let prodDate = b.production_date;
-        if (!prodDate && b.expiry_date) {
+        let prodDate = b.production_date ? String(b.production_date).split('T')[0] : '';
+        if (!prodDate) {
           const pName = (b.products?.name || '').toLowerCase();
           const pCode = (b.products?.product_code || '').toLowerCase();
           let monthsBefore = 6;
@@ -172,7 +179,8 @@ const InventoryList = () => {
           } else if (pName.includes('دقيق') || pCode.includes('flor')) {
             monthsBefore = 9; // 9 months
           }
-          const estimatedProd = new Date(expDate);
+          const baseDate = expStr ? expDate : new Date();
+          const estimatedProd = new Date(baseDate);
           estimatedProd.setMonth(estimatedProd.getMonth() - monthsBefore);
           prodDate = estimatedProd.toISOString().split('T')[0];
         }
@@ -676,21 +684,21 @@ const InventoryList = () => {
 
           {/* Desktop Table View (>= 768px) */}
           <div className="desktop-table-view table-responsive">
-            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
+            <table className="table" style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left', height: '40px' }}>
-                  {!productId && <th style={{ padding: '8px 8px', width: '85px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.code')}</th>}
-                  {!productId && <th style={{ padding: '8px 8px', minWidth: '150px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.name')}</th>}
-                  <th style={{ padding: '8px 8px', width: '90px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.batchNumber')}</th>
-                  <th style={{ padding: '8px 8px', width: '110px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('warehouses.title')}</th>
-                  <th style={{ padding: '8px 8px', width: '50px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'المتبقي' : 'Remaining'}</th>
-                  <th style={{ padding: '8px 8px', width: '75px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.cost')}</th>
-                  <th style={{ padding: '8px 8px', width: '90px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.productionDate')}</th>
-                  <th style={{ padding: '8px 8px', width: '85px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.expiryDate')}</th>
-                  <th style={{ padding: '8px 8px', width: '75px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.daysRemaining')}</th>
-                  <th style={{ padding: '8px 8px', width: '85px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.inventoryValue')}</th>
-                  <th style={{ padding: '8px 8px', width: '80px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.status')}</th>
-                  <th style={{ padding: '8px 8px', width: '45px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'تعديل' : 'Edit'}</th>
+                <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left', height: '42px' }}>
+                  {!productId && <th style={{ padding: '10px 10px', width: '90px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.code')}</th>}
+                  {!productId && <th style={{ padding: '10px 12px', minWidth: '160px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.name')}</th>}
+                  <th style={{ padding: '10px 10px', width: '95px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.batchNumber')}</th>
+                  <th style={{ padding: '10px 10px', minWidth: '130px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('warehouses.title')}</th>
+                  <th style={{ padding: '10px 10px', width: '60px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'المتبقي' : 'Remaining'}</th>
+                  <th style={{ padding: '10px 10px', width: '80px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.cost')}</th>
+                  <th style={{ padding: '10px 10px', width: '100px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.productionDate')}</th>
+                  <th style={{ padding: '10px 10px', width: '95px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.expiryDate')}</th>
+                  <th style={{ padding: '10px 10px', width: '85px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.daysRemaining')}</th>
+                  <th style={{ padding: '10px 10px', width: '95px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.inventoryValue')}</th>
+                  <th style={{ padding: '10px 10px', width: '90px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.status')}</th>
+                  <th style={{ padding: '10px 10px', width: '45px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'تعديل' : 'Edit'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -749,12 +757,9 @@ const InventoryList = () => {
                       {!productId && (
                         <td 
                           style={{ 
-                            padding: '8px 8px', 
-                            minWidth: '150px', 
-                            maxWidth: '220px',
+                            padding: '10px 12px', 
+                            minWidth: '160px', 
                             whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
                             verticalAlign: 'middle'
                           }}
                           title={batch.product_name || ''}
@@ -779,19 +784,16 @@ const InventoryList = () => {
                       </td>
                       <td 
                         style={{ 
-                          padding: '8px 8px', 
-                          width: '110px',
-                          maxWidth: '120px',
+                          padding: '10px 10px', 
+                          minWidth: '130px',
                           whiteSpace: 'nowrap', 
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
                           verticalAlign: 'middle' 
                         }}
                         title={batch.warehouse_name || ''}
                       >
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: 'var(--color-text-secondary)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          <Building2 size={13} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{batch.warehouse_name || '-'}</span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                          <Building2 size={14} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />
+                          <span>{batch.warehouse_name || '-'}</span>
                         </div>
                       </td>
                       <td style={{ padding: '8px 8px', width: '50px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>

@@ -76,53 +76,65 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
         .from('purchase_items')
         .select(`
           *,
-          product:products(name, product_code)
+          product:products(id, name, product_code)
         `)
         .eq('purchase_id', purchaseId);
 
       if (iJoinErr || !iJoined) {
         console.warn('Purchase items detail join notice, falling back:', iJoinErr?.message);
-        const { data: iBase, error: iBaseErr } = await supabase
-          .from('purchase_items')
-          .select('*')
-          .eq('purchase_id', purchaseId);
+        try {
+          const { data: iBase, error: iBaseErr } = await supabase
+            .from('purchase_items')
+            .select('*')
+            .eq('purchase_id', purchaseId);
 
-        if (iBaseErr) throw iBaseErr;
-        itemsList = iBase || [];
-
-        if (itemsList.length > 0) {
-          const prodIds = itemsList.map((it: any) => it.product_id).filter(Boolean);
-          if (prodIds.length > 0) {
-            const { data: prods } = await supabase.from('products').select('id, name, product_code').in('id', prodIds);
-            const pMap = new Map((prods || []).map((p: any) => [p.id, p]));
-            itemsList = itemsList.map((it: any) => ({
-              ...it,
-              product: pMap.get(it.product_id) || it.product
-            }));
+          if (!iBaseErr && iBase) {
+            itemsList = iBase;
+            const prodIds = itemsList.map((it: any) => it.product_id).filter(Boolean);
+            if (prodIds.length > 0) {
+              const { data: prods } = await supabase
+                .from('products')
+                .select('id, name, product_code')
+                .in('id', prodIds);
+              const pMap = new Map((prods || []).map((p: any) => [p.id, p]));
+              itemsList = itemsList.map((it: any) => ({
+                ...it,
+                product: pMap.get(it.product_id) || it.product
+              }));
+            }
           }
+        } catch (itemErr) {
+          console.warn('Fallback purchase_items query error handled safely:', itemErr);
         }
       } else {
-        itemsList = iJoined;
+        itemsList = iJoined || [];
       }
 
       setItems(itemsList);
     } catch (err: any) {
       console.error('Error fetching purchase details:', err);
-      setError(language === 'ar' ? 'تعذر تحميل بعض تفاصيل الفاتورة.' : 'Failed to load details');
+      // Only show error if we could not even load the purchase record
+      if (!purchase) {
+        setError(language === 'ar' ? 'تعذر تحميل بعض تفاصيل الفاتورة.' : 'Failed to load details');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const getStatusText = (status: string) => {
-    const s = (status || '').toUpperCase();
+    if (!status) return isRtl ? 'قيد الانتظار' : 'Pending';
+    const s = String(status).toUpperCase();
     if (s === 'PENDING') return isRtl ? 'قيد الانتظار' : 'Pending';
     if (s === 'CONFIRMED') return isRtl ? 'مؤكد' : 'Confirmed';
     if (s === 'RECEIVED') return isRtl ? 'مستلمة' : 'Received';
     if (s === 'DRAFT') return isRtl ? 'مسودة' : 'Draft';
     if (s === 'ORDERED') return isRtl ? 'مطلوبة' : 'Ordered';
     if (s === 'CANCELLED') return isRtl ? 'ملغاة' : 'Cancelled';
-    return t(`purchases.${status?.toLowerCase()}`) || status;
+    if (s === 'PARTIALLY_RECEIVED') return isRtl ? 'مستلمة جزئياً' : 'Partially Received';
+    const tr = t(`purchases.${status?.toLowerCase()}`);
+    if (tr && !tr.startsWith('purchases.')) return tr;
+    return isRtl ? 'قيد الانتظار' : status;
   };
 
   const handleReceive = async () => {
@@ -177,9 +189,13 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
     );
   }
 
-  const calculatedItemsTotal = items.reduce((acc, it) => acc + (Number(it.total) || (Number(it.quantity || 0) * Number(it.purchase_price || 0)) || 0), 0);
+  const calculatedItemsTotal = items.reduce((acc, it) => {
+    const itTotal = Number(it.total != null ? it.total : (it.subtotal != null ? it.subtotal : (Number(it.quantity || 0) * Number(it.purchase_price ?? it.unit_cost ?? 0))));
+    return acc + (isNaN(itTotal) ? 0 : itTotal);
+  }, 0);
   const rawTotal = Number(purchase?.grand_total ?? purchase?.total_amount ?? purchase?.total ?? purchase?.subtotal ?? 0);
   const grandTotal = (!isNaN(rawTotal) && rawTotal > 0) ? rawTotal : calculatedItemsTotal;
+  const safeGrandTotal = (!isNaN(grandTotal) && grandTotal >= 0) ? grandTotal : 0;
 
   return (
     <div style={{
@@ -296,10 +312,10 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
                       {item.quantity} {item.unit?.code || ''}
                     </td>
                     <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontSize: '0.85rem' }}>
-                      {Number(item.purchase_price || 0).toFixed(2)}
+                      {Number(item.purchase_price ?? item.unit_cost ?? 0).toFixed(2)}
                     </td>
                     <td style={{ padding: '10px 14px', textAlign: isRtl ? 'left' : 'right', fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.875rem' }}>
-                      {Number(item.total || 0).toFixed(2)} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--color-text-secondary)' }}>{t('products.currency')}</span>
+                      {Number(item.total != null ? item.total : (item.subtotal != null ? item.subtotal : (Number(item.quantity || 0) * Number(item.purchase_price ?? item.unit_cost ?? 0)))).toFixed(2)} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--color-text-secondary)' }}>{t('products.currency')}</span>
                     </td>
                   </tr>
                 ))
@@ -318,7 +334,7 @@ const PurchaseDetails: React.FC<PurchaseDetailsProps> = ({ purchaseId, onClose, 
 
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-background)', flexWrap: 'wrap', gap: '12px', flexShrink: 0 }}>
           <div style={{ fontSize: '1.15rem', fontWeight: 700 }}>
-            {t('purchases.grandTotal')}: <span style={{ color: 'var(--color-primary)' }}>{grandTotal.toLocaleString()} {t('products.currency')}</span>
+            {t('purchases.grandTotal')}: <span style={{ color: 'var(--color-primary)' }}>{safeGrandTotal.toLocaleString(isRtl ? 'ar-SA' : 'en-US')} {t('products.currency')}</span>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button 
