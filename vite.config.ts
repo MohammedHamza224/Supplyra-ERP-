@@ -5,8 +5,15 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   envPrefix: ['VITE_', 'SUPABASE_', 'NEXT_PUBLIC_'],
+  server: {
+    port: 5173,
+    host: true, // Exposes dev server on local network for multi-device testing (iOS, Android, Tablet)
+    strictPort: false
+  },
   build: {
-    chunkSizeWarningLimit: 800,
+    target: 'es2022',
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         manualChunks(id) {

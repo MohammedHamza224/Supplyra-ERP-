@@ -109,15 +109,6 @@ const ProductsList = () => {
     const fetchProducts = async () => {
     setLoading(true);
     try {
-      // STEP 1: RAW PRODUCTS QUERY
-      const { data: rawData, error: rawError } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      console.log('RAW PRODUCTS:', rawData);
-      console.log('RAW PRODUCTS ERROR:', rawError);
-
       let query = supabase
         .from('products')
         .select(`
@@ -134,14 +125,7 @@ const ProductsList = () => {
         query = query.or(`name.ilike.%${debouncedSearchTerm}%,product_code.ilike.%${debouncedSearchTerm}%`);
       }
 
-      const { data, error, count } = await query;
-
-      // STEP 6: CHECK FETCH ERROR
-      console.log({
-        productsData: data,
-        productsError: error,
-        productsCount: data?.length
-      });
+      const { data, error } = await query;
 
       if (error) {
         console.error('PRODUCTS FETCH ERROR:', error);
@@ -149,8 +133,6 @@ const ProductsList = () => {
         throw error;
       }
       
-      
-      console.log('BEFORE setProducts:', data);
       setProducts(data || []);
 
     } catch (error: any) {
