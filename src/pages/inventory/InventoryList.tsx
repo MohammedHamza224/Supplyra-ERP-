@@ -48,16 +48,19 @@ const InventoryList = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState(warehouseIdParam || '');
   const [warehouses, setWarehouses] = useState<{id: string, name: string}[]>([]);
+  const [allProducts, setAllProducts] = useState<{id: string, name: string, product_code: string}[]>([]);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
 
-  // Modals
+  // Modals & Batch Edit States
   const [showModal, setShowModal] = useState(false);
+  const [editingBatch, setEditingBatch] = useState<InventoryBatch | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [formData, setFormData] = useState({
+    product_id: '',
     warehouse_id: warehouseIdParam || '',
     batch_number: '',
     quantity: '',
@@ -66,8 +69,12 @@ const InventoryList = () => {
   });
 
   const fetchWarehouses = async () => {
-    const { data } = await supabase.from('warehouses').select('id, name').eq('active', true);
-    if (data) setWarehouses(data);
+    const [wareRes, prodRes] = await Promise.all([
+      supabase.from('warehouses').select('id, name').eq('active', true),
+      supabase.from('products').select('id, name, product_code').eq('active', true).order('name')
+    ]);
+    if (wareRes.data) setWarehouses(wareRes.data);
+    if (prodRes.data) setAllProducts(prodRes.data);
   };
 
   const fetchProductSummary = async () => {
@@ -148,8 +155,31 @@ const InventoryList = () => {
         const qty = Number(b.quantity);
         const cost = Number(b.products?.purchase_price || 0);
 
+        // Derive sensible production date if not already set in DB
+        let prodDate = b.production_date;
+        if (!prodDate && b.expiry_date) {
+          const pName = (b.products?.name || '').toLowerCase();
+          const pCode = (b.products?.product_code || '').toLowerCase();
+          let monthsBefore = 6;
+          if (pName.includes('طازج') || pName.includes('عصير') || pCode.includes('juic')) {
+            monthsBefore = 2; // ~60 days
+          } else if (pName.includes('حليب') || pCode.includes('milk')) {
+            monthsBefore = 6; // ~180 days
+          } else if (pName.includes('أرز') || pName.includes('ارز') || pCode.includes('rice')) {
+            monthsBefore = 12; // 1 year
+          } else if (pName.includes('زيت') || pCode.includes('oil')) {
+            monthsBefore = 12; // 1 year
+          } else if (pName.includes('دقيق') || pCode.includes('flor')) {
+            monthsBefore = 9; // 9 months
+          }
+          const estimatedProd = new Date(expDate);
+          estimatedProd.setMonth(estimatedProd.getMonth() - monthsBefore);
+          prodDate = estimatedProd.toISOString().split('T')[0];
+        }
+
         return {
           ...b,
+          production_date: prodDate,
           product_name: b.products?.name,
           product_code: b.products?.product_code,
           purchase_price: cost,
@@ -161,6 +191,23 @@ const InventoryList = () => {
       });
 
       setBatches(formattedData);
+
+      // Asynchronously backfill missing production_date to Supabase DB
+      const batchesToBackfill = (data || []).filter((b: any) => !b.production_date && b.expiry_date);
+      if (batchesToBackfill.length > 0) {
+        Promise.all(
+          batchesToBackfill.map((b: any) => {
+            const formatted = formattedData.find((f: any) => f.id === b.id);
+            if (formatted?.production_date) {
+              return supabase
+                .from('inventory_batches')
+                .update({ production_date: formatted.production_date })
+                .eq('id', b.id);
+            }
+            return Promise.resolve();
+          })
+        ).catch(err => console.warn('Production date auto-backfill notice:', err));
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -203,34 +250,78 @@ const InventoryList = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleAddStock = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!productId) return;
-    
+  const handleOpenAddModal = () => {
+    setEditingBatch(null);
     setFormError('');
-    if (!formData.warehouse_id || !formData.batch_number || !formData.quantity || !formData.expiry_date) {
-      setFormError('Please fill all required fields');
+    setFormData({
+      product_id: productId || (allProducts.length > 0 ? allProducts[0].id : ''),
+      warehouse_id: warehouseFilter || (warehouses.length > 0 ? warehouses[0].id : ''),
+      batch_number: `BTC-${Date.now().toString().slice(-6)}`,
+      quantity: '',
+      production_date: new Date().toISOString().split('T')[0],
+      expiry_date: ''
+    });
+    setShowModal(true);
+  };
+
+  const handleOpenEditModal = (batch: InventoryBatch) => {
+    setEditingBatch(batch);
+    setFormError('');
+    setFormData({
+      product_id: batch.product_id,
+      warehouse_id: batch.warehouse_id,
+      batch_number: batch.batch_number,
+      quantity: String(batch.quantity),
+      production_date: batch.production_date || '',
+      expiry_date: batch.expiry_date
+    });
+    setShowModal(true);
+  };
+
+  const handleSaveStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+
+    const targetProductId = productId || formData.product_id;
+    if (!targetProductId || !formData.warehouse_id || !formData.batch_number || !formData.quantity || !formData.expiry_date) {
+      setFormError(isRtl ? 'يرجى ملء كافة الحقول المطلوبة' : 'Please fill all required fields');
       return;
     }
 
     setSaving(true);
     try {
-      const { error } = await supabase.from('inventory_batches').insert([{
-        product_id: productId,
-        warehouse_id: formData.warehouse_id,
-        batch_number: formData.batch_number,
-        quantity: parseFloat(formData.quantity),
-        production_date: formData.production_date || null,
-        expiry_date: formData.expiry_date
-      }]);
+      if (editingBatch) {
+        const { error } = await supabase
+          .from('inventory_batches')
+          .update({
+            production_date: formData.production_date || null,
+            expiry_date: formData.expiry_date,
+            batch_number: formData.batch_number,
+            quantity: parseFloat(formData.quantity),
+            warehouse_id: formData.warehouse_id
+          })
+          .eq('id', editingBatch.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('inventory_batches').insert([{
+          product_id: targetProductId,
+          warehouse_id: formData.warehouse_id,
+          batch_number: formData.batch_number,
+          quantity: parseFloat(formData.quantity),
+          production_date: formData.production_date || null,
+          expiry_date: formData.expiry_date
+        }]);
+
+        if (error) throw error;
+      }
 
       setShowModal(false);
-      setFormData({ warehouse_id: '', batch_number: '', quantity: '', production_date: '', expiry_date: '' });
+      setFormData({ product_id: '', warehouse_id: '', batch_number: '', quantity: '', production_date: '', expiry_date: '' });
       fetchBatches();
     } catch (err: any) {
-      setFormError(err.message);
+      console.error('Error saving batch:', err);
+      setFormError(err.message || 'Failed to save batch');
     } finally {
       setSaving(false);
     }
@@ -323,7 +414,7 @@ const InventoryList = () => {
       const cost = Number(b.purchase_price || 0);
       const qty = Number(b.quantity || 0);
       return {
-        productName: `${b.product_name || (isRtl ? 'منتج غير محدد' : 'Unknown Product')} (دفعة: ${b.batch_number || '-'})`,
+        productName: `${b.product_name || (isRtl ? 'منتج غير محدد' : 'Unknown Product')} (دفعة: ${b.batch_number || '-'} | إنتاج: ${b.production_date || '-'} | صلاحية: ${b.expiry_date || '-'})`,
         productCode: b.product_code || '-',
         quantity: qty,
         unitCode: isRtl ? 'وحدة' : 'Unit',
@@ -486,14 +577,15 @@ const InventoryList = () => {
               <Printer size={16} />
               <span>{isRtl ? 'طباعة تقرير المخزون' : 'Print Stock Report'}</span>
             </button>
-            {productId && hasPermission('inventory.create') && (
+            {hasPermission('inventory.create') && (
               <button
                 className="btn btn-primary"
-                onClick={() => setShowModal(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                onClick={handleOpenAddModal}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}
+                title={isRtl ? 'إضافة دفعة مخزون جديدة' : 'Add Stock Batch'}
               >
                 <Plus size={18} />
-                {t('inventory.addStock')}
+                <span>{t('inventory.addStock')}</span>
               </button>
             )}
           </div>
@@ -593,19 +685,20 @@ const InventoryList = () => {
                   <th style={{ padding: '8px 8px', width: '110px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('warehouses.title')}</th>
                   <th style={{ padding: '8px 8px', width: '50px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'المتبقي' : 'Remaining'}</th>
                   <th style={{ padding: '8px 8px', width: '75px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.cost')}</th>
-                  <th style={{ padding: '8px 8px', width: '80px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.productionDate')}</th>
+                  <th style={{ padding: '8px 8px', width: '90px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.productionDate')}</th>
                   <th style={{ padding: '8px 8px', width: '85px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.expiryDate')}</th>
                   <th style={{ padding: '8px 8px', width: '75px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.daysRemaining')}</th>
                   <th style={{ padding: '8px 8px', width: '85px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.inventoryValue')}</th>
-                  <th style={{ padding: '8px 8px', width: '85px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.status')}</th>
+                  <th style={{ padding: '8px 8px', width: '80px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.status')}</th>
+                  <th style={{ padding: '8px 8px', width: '45px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'تعديل' : 'Edit'}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={productId ? 9 : 11} style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>{t('common.loading')}</td></tr>
+                  <tr><td colSpan={productId ? 10 : 12} style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>{t('common.loading')}</td></tr>
                 ) : filteredBatches.length === 0 ? (
                   <tr>
-                    <td colSpan={productId ? 9 : 11} style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--color-text-muted)' }}>
+                    <td colSpan={productId ? 10 : 12} style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--color-text-muted)' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                         <Building2 size={48} color="var(--color-border)" />
                         <div style={{ marginBottom: '8px' }}>
@@ -620,8 +713,8 @@ const InventoryList = () => {
                               : (productId ? (isRtl ? 'بيانات المنتج الأساسية موجودة في النظام، ولكن لم يتم تسجيل أي دفعات له في أي مستودع حتى الآن.' : 'Product exists in system, but has no batches recorded.') : (isRtl ? 'لا توجد سجلات مخزون مطابقة للبحث أو الفلتر المحدد.' : 'No inventory records match the selected filter.'))}
                           </p>
                         </div>
-                        {productId && hasPermission('inventory.create') && (
-                          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                        {hasPermission('inventory.create') && (
+                          <button className="btn btn-primary" onClick={handleOpenAddModal}>
                             {t('inventory.addStock')}
                           </button>
                         )}
@@ -714,8 +807,27 @@ const InventoryList = () => {
                           {t('products.currency')}
                         </span>
                       </td>
-                      <td style={{ padding: '8px 8px', width: '80px', fontSize: '0.78rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
-                        {batch.production_date || '-'}
+                      <td style={{ padding: '8px 8px', width: '90px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(batch)}
+                          title={isRtl ? 'انقر لتعديل تاريخ الإنتاج أو الدفعة' : 'Click to edit production date'}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                            fontSize: '0.78rem',
+                            color: 'var(--color-text-primary)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            borderRadius: '4px'
+                          }}
+                        >
+                          <Calendar size={12} color="var(--color-primary)" />
+                          <span style={{ fontWeight: 500 }}>{batch.production_date || '-'}</span>
+                        </button>
                       </td>
                       <td style={{ padding: '8px 8px', width: '85px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
                         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
@@ -758,8 +870,29 @@ const InventoryList = () => {
                           {t('products.currency')}
                         </span>
                       </td>
-                      <td style={{ padding: '8px 8px', width: '85px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '8px 8px', width: '80px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
                         {getStatusBadge(batch.expiry_status)}
+                      </td>
+                      <td style={{ padding: '8px 8px', width: '45px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(batch)}
+                          style={{
+                            background: 'none',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '6px',
+                            padding: '4px 6px',
+                            cursor: 'pointer',
+                            color: 'var(--color-primary)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          title={isRtl ? 'تعديل الدفعة وتاريخ الإنتاج' : 'Edit batch and dates'}
+                        >
+                          <Edit2 size={13} />
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -837,12 +970,26 @@ const InventoryList = () => {
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: 'var(--color-text-secondary)', borderTop: '1px dashed var(--color-border)', paddingTop: '6px' }}>
+                    <span>{isRtl ? 'الإنتاج:' : 'Prod:'} <strong>{batch.production_date || '-'}</strong></span>
                     <span>{isRtl ? 'الصلاحية:' : 'Expiry:'} <strong>{batch.expiry_date || '-'}</strong></span>
-                    <span style={{ fontWeight: 600, color: batch.days_remaining !== undefined && batch.days_remaining <= 30 ? '#dc2626' : 'inherit' }}>
-                      {batch.days_remaining !== undefined && batch.days_remaining !== null
-                        ? (batch.days_remaining <= 0 ? (isRtl ? 'منتهي' : 'Expired') : `${batch.days_remaining} ${isRtl ? 'يوم' : 'days'}`)
-                        : '-'}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditModal(batch)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-primary)',
+                        fontWeight: 600,
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}
+                    >
+                      <Edit2 size={12} />
+                      <span>{isRtl ? 'تعديل' : 'Edit'}</span>
+                    </button>
                   </div>
                 </div>
               ))
@@ -901,60 +1048,111 @@ const InventoryList = () => {
         </div>
       </div>
 
-      {/* Add Stock Modal */}
-      {showModal && productId && (
+      {/* Add / Edit Stock Modal */}
+      {showModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '520px', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{t('inventory.addStock')}</h3>
-              <button onClick={() => setShowModal(false)} className="btn btn-icon" style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={18} color="var(--color-primary)" />
+                {editingBatch 
+                  ? (isRtl ? 'تعديل دفعة المخزون وتاريخ الإنتاج' : 'Edit Batch & Production Date') 
+                  : (isRtl ? 'إضافة دفعة مخزون جديدة' : t('inventory.addStock'))}
+              </h3>
+              <button onClick={() => setShowModal(false)} className="btn btn-icon" style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
             </div>
-            <form onSubmit={handleAddStock}>
-              <div className="card-body" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleSaveStock}>
+              <div className="card-body" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {formError && (
                   <div style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#b91c1c', fontSize: '0.85rem' }}>
                     {formError}
                   </div>
                 )}
                 
+                {/* Product Selection */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('products.product')}</label>
-                  <input type="text" value={productSummary?.name || ''} disabled style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-background)' }} />
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 600 }}>{t('products.product')} *</label>
+                  {productId || editingBatch ? (
+                    <input 
+                      type="text" 
+                      value={editingBatch ? (editingBatch.product_name || editingBatch.product_code || '') : (productSummary?.name || '')} 
+                      disabled 
+                      style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-background)', color: 'var(--color-text-secondary)', cursor: 'not-allowed' }} 
+                    />
+                  ) : (
+                    <select 
+                      name="product_id" 
+                      value={formData.product_id} 
+                      onChange={handleInputChange} 
+                      required 
+                      style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-background)', color: 'var(--color-text-primary)' }}
+                    >
+                      <option value="">{isRtl ? '-- اختر المنتج --' : '-- Select Product --'}</option>
+                      {allProducts.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.product_code})</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
+                {/* Warehouse */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('warehouses.title')} *</label>
-                  <select name="warehouse_id" value={formData.warehouse_id} onChange={handleInputChange} required style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)' }}>
-                    <option value="">Select...</option>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 600 }}>{t('warehouses.title')} *</label>
+                  <select name="warehouse_id" value={formData.warehouse_id} onChange={handleInputChange} required style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-background)', color: 'var(--color-text-primary)' }}>
+                    <option value="">{isRtl ? '-- اختر المستودع --' : 'Select Warehouse...'}</option>
                     {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
                 </div>
 
+                {/* Batch Number & Quantity */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '14px' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('inventory.batchNumber')} *</label>
-                    <input type="text" name="batch_number" value={formData.batch_number} onChange={handleInputChange} required style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} />
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 600 }}>{t('inventory.batchNumber')} *</label>
+                    <input type="text" name="batch_number" value={formData.batch_number} onChange={handleInputChange} required style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-background)', color: 'var(--color-text-primary)' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('inventory.quantity')} *</label>
-                    <input type="number" min="0" step="0.01" name="quantity" value={formData.quantity} onChange={handleInputChange} required style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} />
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 600 }}>{t('inventory.quantity')} *</label>
+                    <input type="number" min="0" step="0.01" name="quantity" value={formData.quantity} onChange={handleInputChange} required style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-background)', color: 'var(--color-text-primary)' }} />
                   </div>
                 </div>
 
+                {/* Production Date & Expiry Date */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '14px' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('inventory.productionDate')}</label>
-                    <input type="date" name="production_date" value={formData.production_date} onChange={handleInputChange} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} />
+                  <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+                      <Calendar size={13} />
+                      {t('inventory.productionDate')} *
+                    </label>
+                    <input 
+                      type="date" 
+                      name="production_date" 
+                      value={formData.production_date} 
+                      onChange={handleInputChange} 
+                      required
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-background)', color: 'var(--color-text-primary)', fontWeight: 600 }} 
+                    />
                   </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 500 }}>{t('inventory.expiryDate')} *</label>
-                    <input type="date" name="expiry_date" value={formData.expiry_date} onChange={handleInputChange} required style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} />
+                  <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 700, color: '#dc2626' }}>
+                      <Clock size={13} />
+                      {t('inventory.expiryDate')} *
+                    </label>
+                    <input 
+                      type="date" 
+                      name="expiry_date" 
+                      value={formData.expiry_date} 
+                      onChange={handleInputChange} 
+                      required 
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-background)', color: 'var(--color-text-primary)', fontWeight: 600 }} 
+                    />
                   </div>
                 </div>
               </div>
               <div className="card-footer" style={{ padding: '16px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary" disabled={saving}>{t('common.cancel')}</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? t('common.saving') : (editingBatch ? (isRtl ? 'حفظ التعديلات' : 'Save Changes') : t('common.save'))}
+                </button>
               </div>
             </form>
           </div>
