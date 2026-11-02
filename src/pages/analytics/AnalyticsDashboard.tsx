@@ -98,17 +98,17 @@ export default function AnalyticsDashboard() {
 
       // Parallel Data Retrieval
       const [
-        { data: rawOrders },
-        { data: rawOrderItems },
-        { data: rawPurchases },
-        { data: rawPurchaseItems },
-        { data: rawProducts },
-        { data: rawBatches },
-        { data: rawCustomers },
-        { data: rawSuppliers }
+        ordersRes,
+        orderItemsRes,
+        purchasesRes,
+        purchaseItemsRes,
+        productsRes,
+        batchesRes,
+        customersRes,
+        suppliersRes
       ] = await Promise.all([
-        supabase.from('orders').select('id, total_amount, status, created_at, customer_id, customer:customers(name)'),
-        supabase.from('order_items').select('quantity, unit_price, subtotal, product_id, product:products(name, product_code, purchase_price, category:categories(name), brand:brands(name)), order:orders!inner(status, created_at)'),
+        supabase.from('orders').select('id, total_amount, status, created_at, order_date, customer_id, customer:customers(name)'),
+        supabase.from('order_items').select('id, order_id, product_id, quantity, unit_price, total'),
         supabase.from('purchases').select('*'),
         supabase.from('purchase_items').select('id, purchase_id, product_id, quantity, unit_cost, subtotal'),
         supabase.from('products').select('id, name, product_code, purchase_price, selling_price, min_stock, active, category:categories(name), brand:brands(name)'),
@@ -116,6 +116,21 @@ export default function AnalyticsDashboard() {
         supabase.from('customers').select('id, name, active'),
         supabase.from('suppliers').select('id, name, active')
       ]);
+
+      let rawOrders = ordersRes.data;
+      if (ordersRes.error) {
+        console.warn('Orders join query warning in Analytics, fallback to select *:', ordersRes.error);
+        const fb = await supabase.from('orders').select('*');
+        rawOrders = fb.data || [];
+      }
+
+      const rawOrderItems = orderItemsRes.data || [];
+      const rawPurchases = purchasesRes.data || [];
+      const rawProducts = productsRes.data || [];
+      const rawCustomers = customersRes.data || [];
+      const rawSuppliers = suppliersRes.data || [];
+      const rawBatches = batchesRes.data || [];
+      const rawPurchaseItems = purchaseItemsRes.data || [];
 
       const parseDateSafe = (dInput: any): Date | null => {
         if (!dInput) return null;
@@ -132,6 +147,9 @@ export default function AnalyticsDashboard() {
       const fromTime = fromDateStr ? parseDateSafe(fromDateStr)?.getTime() || null : null;
       const toTime = toDateStr ? parseDateSafe(toDateStr)?.getTime() || null : null;
 
+      const customerByIdMap = new Map((rawCustomers || []).map((c: any) => [c.id, c.name]));
+      const productByIdMap = new Map((rawProducts || []).map((p: any) => [p.id, p]));
+
       // Filter Sales Orders based on selected Date Range
       const validOrders = (rawOrders || []).filter((o: any) => {
         if ((o.status || '').toUpperCase() === 'CANCELLED') return false;
@@ -141,6 +159,16 @@ export default function AnalyticsDashboard() {
         if (fromTime && t < fromTime) return false;
         if (toTime && t > toTime) return false;
         return true;
+      }).map((o: any) => {
+        const custJoined: any = Array.isArray(o.customer) ? o.customer[0] : o.customer;
+        const custName = custJoined?.name || customerByIdMap.get(o.customer_id) || (isRtl ? 'عميل نقدي' : 'Walk-in Customer');
+        const amount = Number(o.total_amount ?? o.grand_total ?? o.total ?? o.subtotal ?? 0);
+        return {
+          ...o,
+          customer: { name: custName },
+          total_amount: amount,
+          grand_total: amount
+        };
       });
 
       // Filter Purchases based on selected Date Range
@@ -154,20 +182,26 @@ export default function AnalyticsDashboard() {
         return true;
       });
 
-      // Filter Order Items based on Date Range
+      // Filter Order Items based on Valid Orders
+      const validOrderIds = new Set(validOrders.map(o => o.id));
       const validOrderItems = (rawOrderItems || []).filter((item: any) => {
-        const orderStatus = (item.order?.status || '').toUpperCase();
-        if (orderStatus === 'CANCELLED') return false;
-        const dStr = item.order?.created_at;
-        if (!dStr) return true;
-        const d = new Date(dStr);
-        if (fromDateStr && d < new Date(fromDateStr)) return false;
-        if (toDateStr && d > new Date(toDateStr)) return false;
-        return true;
+        return validOrderIds.has(item.order_id);
+      }).map((item: any) => {
+        const prod = productByIdMap.get(item.product_id);
+        const qty = Number(item.quantity || 0);
+        const unitPrice = Number(item.unit_price || 0);
+        const total = Number(item.total != null ? item.total : (qty * unitPrice));
+        return {
+          ...item,
+          product: prod,
+          quantity: qty,
+          unit_price: unitPrice,
+          total: total
+        };
       });
 
       // 1. Calculate Sales & Purchase Financial Metrics
-      const totalSalesRevenue = validOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || o.grand_total || 0), 0);
+      const totalSalesRevenue = validOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
       const totalPurchasesAmount = validPurchases.reduce((sum: number, p: any) => sum + Number(p.total_amount ?? p.grand_total ?? p.total ?? p.subtotal ?? 0), 0);
 
       // COGS (Cost of Goods Sold) calculation based on sold items
@@ -215,7 +249,7 @@ export default function AnalyticsDashboard() {
           customerSalesMap[cName] = { name: cName, count: 0, totalSpent: 0 };
         }
         customerSalesMap[cName].count += 1;
-        customerSalesMap[cName].totalSpent += Number(o.grand_total || 0);
+        customerSalesMap[cName].totalSpent += Number(o.total_amount || 0);
       });
 
       const sortedTopCustomers = Object.values(customerSalesMap)

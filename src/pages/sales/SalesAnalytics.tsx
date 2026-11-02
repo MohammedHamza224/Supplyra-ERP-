@@ -39,24 +39,32 @@ const SalesAnalytics: React.FC = () => {
         fromDateFilter = start.toISOString();
       }
 
-      // 1. Fetch Orders
-      let ordersQuery = supabase.from('orders').select('id, status, payment_status, grand_total, created_at');
-      if (fromDateFilter) {
-        ordersQuery = ordersQuery.gte('created_at', fromDateFilter);
+      // 1. Fetch Orders (Defensive)
+      let ordersRes = await supabase.from('orders').select('*');
+      if (ordersRes.error) {
+        ordersRes = await supabase.from('orders').select('id, status, payment_status, total_amount, created_at, order_date');
       }
+      const rawOrders = ordersRes.data || [];
 
-      const { data: orders, error: ordersError } = await ordersQuery;
-      if (ordersError) throw ordersError;
+      const orders = rawOrders.filter((o: any) => {
+        if (!fromDateFilter) return true;
+        const dStr = o.order_date || o.created_at;
+        if (!dStr) return true;
+        return new Date(dStr).getTime() >= new Date(fromDateFilter).getTime();
+      }).map((o: any) => ({
+        ...o,
+        total_amount: Number(o.total_amount ?? o.grand_total ?? o.total ?? o.subtotal ?? 0)
+      }));
 
-      // 2. Fetch Order Items for Top Products
-      // We use order:orders!inner to ensure we only get items for the filtered orders.
-      let itemsQuery = supabase.from('order_items').select('quantity, total, product:products(name), order:orders!inner(status, created_at)');
-      if (fromDateFilter) {
-        itemsQuery = itemsQuery.gte('orders.created_at', fromDateFilter);
-      }
-      
-      const { data: items, error: itemsError } = await itemsQuery;
-      if (itemsError) throw itemsError;
+      // 2. Fetch Order Items & Products for Top Products
+      const validOrderIds = new Set(orders.map(o => o.id));
+      const [itemsRes, productsRes] = await Promise.all([
+        supabase.from('order_items').select('id, order_id, product_id, quantity, total'),
+        supabase.from('products').select('id, name')
+      ]);
+
+      const productNameMap = new Map((productsRes.data || []).map((p: any) => [p.id, p.name]));
+      const items = (itemsRes.data || []).filter((it: any) => validOrderIds.has(it.order_id));
 
       // Aggregate Orders
       let totalRev = 0;
@@ -87,7 +95,7 @@ const SalesAnalytics: React.FC = () => {
         }
 
         if (validRevenueStatuses.includes(o.status)) {
-          totalRev += Number(o.grand_total || 0);
+          totalRev += Number(o.total_amount || 0);
         }
 
         if (o.status === 'COMPLETED') completedCount++;
@@ -102,21 +110,23 @@ const SalesAnalytics: React.FC = () => {
       setPaymentBreakdown(paymentCounts);
 
       // Aggregate Products
-      const productMap: Record<string, { name: string, quantity: number, total: number }> = {};
+      const productAggregateMap: Record<string, { name: string, quantity: number, total: number }> = {};
+      const orderMap = new Map(orders.map(o => [o.id, o]));
       
       (items || []).forEach(item => {
-        const orderStatus = (item.order as any)?.status;
-        if (!validRevenueStatuses.includes(orderStatus)) return;
+        const order = orderMap.get(item.order_id);
+        const orderStatus = order?.status;
+        if (!orderStatus || !validRevenueStatuses.includes(orderStatus)) return;
 
-        const prodName = (item.product as any)?.name || 'Unknown';
-        if (!productMap[prodName]) {
-          productMap[prodName] = { name: prodName, quantity: 0, total: 0 };
+        const prodName = productNameMap.get(item.product_id) || 'Unknown';
+        if (!productAggregateMap[prodName]) {
+          productAggregateMap[prodName] = { name: prodName, quantity: 0, total: 0 };
         }
-        productMap[prodName].quantity += Number(item.quantity || 0);
-        productMap[prodName].total += Number(item.total || 0);
+        productAggregateMap[prodName].quantity += Number(item.quantity || 0);
+        productAggregateMap[prodName].total += Number(item.total || 0);
       });
 
-      const sortedProducts = Object.values(productMap)
+      const sortedProducts = Object.values(productAggregateMap)
         .sort((a, b) => b.quantity - a.quantity)
         .slice(0, 5);
 

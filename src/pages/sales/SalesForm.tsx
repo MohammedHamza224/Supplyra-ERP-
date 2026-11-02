@@ -102,10 +102,18 @@ const SalesForm: React.FC<SalesFormProps> = ({ sale, isOpen, onClose, onSuccess 
       setWarehouses(wareRes.data || []);
       setProducts(prodRes.data || []);
 
-      const { data: batchesData } = await supabase
+      let batchesRes = await supabase
         .from('inventory_batches')
-        .select('product_id, warehouse_id, quantity, active, warehouse:warehouses(id, name)')
-        .eq('active', true);
+        .select('product_id, warehouse_id, quantity, warehouse:warehouses(id, name)')
+        .gt('quantity', 0);
+
+      if (batchesRes.error) {
+        batchesRes = await supabase
+          .from('inventory_batches')
+          .select('product_id, warehouse_id, quantity');
+      }
+
+      const batchesData = batchesRes.data;
 
       const mapping: Record<string, { id: string, name: string, qty: number }[]> = {};
       (batchesData || []).forEach((b: any) => {

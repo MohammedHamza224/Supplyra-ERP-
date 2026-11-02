@@ -166,59 +166,98 @@ const Dashboard = () => {
         }
       }
 
-      // Base queries for master counts
+      // Base queries for master counts and dictionaries
       const [
         { count: pCount },
         { count: cCount },
         { count: sCount },
-        { count: wCount }
+        { count: wCount },
+        { data: customersList },
+        { data: productsList }
       ] = await Promise.all([
         supabase.from('products').select('*', { count: 'exact', head: true }).eq('active', true),
         supabase.from('customers').select('*', { count: 'exact', head: true }).eq('active', true),
         supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('active', true),
-        supabase.from('warehouses').select('*', { count: 'exact', head: true }).eq('active', true)
+        supabase.from('warehouses').select('*', { count: 'exact', head: true }).eq('active', true),
+        supabase.from('customers').select('id, name, phone'),
+        supabase.from('products').select('id, name, purchase_price')
       ]);
 
-      // 1. Sales / Orders Query (Filtered by Date Range)
-      let ordersQuery = supabase
+      const customerMap = new Map((customersList || []).map((c: any) => [c.id, c]));
+      const productMap = new Map((productsList || []).map((p: any) => [p.id, p]));
+
+      const parseDateSafe = (dInput: any): Date | null => {
+        if (!dInput) return null;
+        if (dInput instanceof Date) return dInput;
+        const str = String(dInput);
+        if (str.length === 10 && str.includes('-')) {
+          const [y, m, d] = str.split('-').map(Number);
+          return new Date(y, m - 1, d, 12, 0, 0);
+        }
+        const parsed = new Date(str);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      };
+
+      const fromTime = fromDateStr ? parseDateSafe(fromDateStr)?.getTime() || null : null;
+      const toTime = toDateStr ? parseDateSafe(toDateStr)?.getTime() || null : null;
+
+      // 1. Sales / Orders Query (Defensive & Joined)
+      let ordersRes = await supabase
         .from('orders')
         .select(`
-          id, 
-          order_number, 
-          total_amount, 
-          grand_total,
-          tax,
-          discount,
-          created_at, 
-          status, 
-          payment_status, 
-          customer_id,
+          *,
           customer:customers(name, phone)
         `)
         .neq('status', 'cancelled')
         .neq('status', 'CANCELLED')
         .order('created_at', { ascending: false });
 
-      if (fromDateStr) ordersQuery = ordersQuery.gte('created_at', fromDateStr);
-      if (toDateStr) ordersQuery = ordersQuery.lte('created_at', toDateStr);
-      const { data: orders } = await ordersQuery;
+      if (ordersRes.error) {
+        console.warn('Orders join query warning, falling back to basic orders select:', ordersRes.error);
+        ordersRes = await supabase
+          .from('orders')
+          .select('*')
+          .neq('status', 'cancelled')
+          .neq('status', 'CANCELLED')
+          .order('created_at', { ascending: false });
+      }
 
-      setRawOrders(orders || []);
+      const allOrders = ordersRes.data || [];
+
+      // Filter and enrich orders in-memory
+      const orders = allOrders.filter((o: any) => {
+        const dObj = parseDateSafe(o.order_date || o.created_at);
+        if (!dObj) return true;
+        const t = dObj.getTime();
+        if (fromTime && t < fromTime) return false;
+        if (toTime && t > toTime) return false;
+        return true;
+      }).map((o: any) => {
+        const custJoined: any = Array.isArray(o.customer) ? o.customer[0] : o.customer;
+        const custLookup = customerMap.get(o.customer_id);
+        const resolvedCustomer = custJoined || custLookup || { name: (language === 'ar' ? 'عميل نقدي' : 'Cash Customer'), phone: '' };
+        const amount = Number(o.total_amount ?? o.grand_total ?? o.total ?? o.subtotal ?? 0);
+        return {
+          ...o,
+          customer: resolvedCustomer,
+          grand_total: amount,
+          total_amount: amount
+        };
+      });
+
+      setRawOrders(orders);
       setTablePage(1);
 
       let totalSales = 0;
-      let totalOrders = 0;
+      let totalOrders = orders.length;
       let salesByDate: Record<string, number> = {};
       
-      if (orders) {
-        totalOrders = orders.length;
-        orders.forEach(o => {
-          const val = Number((o as any).grand_total ?? (o as any).total_amount ?? 0);
-          totalSales += val;
-          const dateKey = new Date(o.created_at).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' });
-          salesByDate[dateKey] = (salesByDate[dateKey] || 0) + val;
-        });
-      }
+      orders.forEach(o => {
+        const val = Number(o.grand_total ?? o.total_amount ?? 0);
+        totalSales += val;
+        const dateKey = new Date(o.order_date || o.created_at).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' });
+        salesByDate[dateKey] = (salesByDate[dateKey] || 0) + val;
+      });
 
       const salesTrend = Object.keys(salesByDate).map(date => ({
         date,
@@ -242,21 +281,6 @@ const Dashboard = () => {
         .neq('status', 'cancelled')
         .neq('status', 'CANCELLED');
 
-      const parseDateSafe = (dInput: any): Date | null => {
-        if (!dInput) return null;
-        if (dInput instanceof Date) return dInput;
-        const str = String(dInput);
-        if (str.length === 10 && str.includes('-')) {
-          const [y, m, d] = str.split('-').map(Number);
-          return new Date(y, m - 1, d, 12, 0, 0);
-        }
-        const parsed = new Date(str);
-        return isNaN(parsed.getTime()) ? null : parsed;
-      };
-
-      const fromTime = fromDateStr ? parseDateSafe(fromDateStr)?.getTime() || null : null;
-      const toTime = toDateStr ? parseDateSafe(toDateStr)?.getTime() || null : null;
-
       const purchases = (rawPurchases || []).filter((p: any) => {
         const dObj = parseDateSafe(p.purchase_date || p.issue_date || p.created_at);
         if (!dObj) return true;
@@ -269,30 +293,36 @@ const Dashboard = () => {
       const totalPurchases = purchases.reduce((sum, p) => sum + Number((p as any).grand_total ?? (p as any).total_amount ?? (p as any).total ?? (p as any).subtotal ?? 0), 0);
 
       // 3. Order Items (COGS, Top Products & Total Quantity Sold)
-      let orderItemsQuery = supabase.from('order_items').select('quantity, subtotal, product:products(name, purchase_price)');
-      if (orders && orders.length > 0) {
-        orderItemsQuery = orderItemsQuery.in('order_id', orders.map(o => o.id));
-      } else {
-        orderItemsQuery = orderItemsQuery.eq('order_id', '00000000-0000-0000-0000-000000000000');
+      let orderItems: any[] = [];
+      if (orders.length > 0) {
+        const orderIds = orders.map(o => o.id);
+        const { data: itemsData, error: itemsErr } = await supabase
+          .from('order_items')
+          .select('quantity, total, product_id, order_id')
+          .in('order_id', orderIds);
+
+        if (!itemsErr && itemsData) {
+          orderItems = itemsData;
+        } else {
+          const { data: allItems } = await supabase.from('order_items').select('*');
+          orderItems = (allItems || []).filter((it: any) => orderIds.includes(it.order_id));
+        }
       }
-      const { data: orderItems } = await orderItemsQuery;
 
       let totalCogs = 0;
       let totalQtySold = 0;
       const productSales: Record<string, number> = {};
 
-      if (orderItems) {
-        orderItems.forEach((item: any) => {
-          const prod: any = Array.isArray(item.product) ? item.product[0] : item.product;
-          const cost = Number(prod?.purchase_price || 0);
-          const qty = Number(item.quantity || 0);
-          const name = prod?.name || 'Unknown';
+      orderItems.forEach((item: any) => {
+        const prod = productMap.get(item.product_id);
+        const cost = Number(prod?.purchase_price || 0);
+        const qty = Number(item.quantity || 0);
+        const name = prod?.name || (language === 'ar' ? 'منتج غير محدد' : 'Product');
 
-          totalCogs += (cost * qty);
-          totalQtySold += qty;
-          productSales[name] = (productSales[name] || 0) + qty;
-        });
-      }
+        totalCogs += (cost * qty);
+        totalQtySold += qty;
+        productSales[name] = (productSales[name] || 0) + qty;
+      });
 
       const grossProfit = totalSales - totalCogs;
       const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
@@ -351,8 +381,8 @@ const Dashboard = () => {
           recentActivity.push({
             type: language === 'ar' ? 'فاتورة بيع' : 'Sale Invoice',
             ref: o.order_number,
-            date: new Date(o.created_at),
-            status: st === 'CONFIRMED' || st === 'DELIVERED' ? 'مكتملة' : st === 'DRAFT' ? 'مسودة' : 'ملغاة'
+            date: new Date(o.order_date || o.created_at),
+            status: st === 'CONFIRMED' || st === 'DELIVERED' || st === 'COMPLETED' ? (language === 'ar' ? 'مكتملة' : 'Completed') : st === 'DRAFT' ? (language === 'ar' ? 'مسودة' : 'Draft') : (language === 'ar' ? 'معتمدة' : 'Confirmed')
           });
         });
       }
