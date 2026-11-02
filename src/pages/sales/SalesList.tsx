@@ -67,19 +67,26 @@ const SalesList = () => {
         creatorName: sale.created_by_name,
         notes: sale.notes,
         subtotal: Number(sale.subtotal || sale.total_amount || 0),
-        discount: Number(sale.discount || 0),
+        discount: Number(sale.discount || sale.discount_amount || 0),
         tax: Number(sale.tax || sale.tax_amount || 0),
         grandTotal: Number(sale.grand_total || sale.total_amount || 0),
-        items: saleItems.map((item: any) => ({
-          productName: item.product?.name || item.product_name || (isRtl ? 'صنف غير محدد' : 'General Item'),
-          productCode: item.product?.product_code || item.product?.code || '-',
-          quantity: Number(item.quantity || 0),
-          unitCode: isRtl ? 'وحدة' : 'Unit',
-          price: Number(item.unit_price || item.price || 0),
-          discount: Number(item.discount || 0),
-          taxAmount: Number(item.tax || 0),
-          total: Number(item.total_price || item.total || 0)
-        }))
+        items: saleItems.map((item: any) => {
+          const qty = Number(item.quantity || 0);
+          const price = Number(item.unit_price || item.price || item.selling_price || 0);
+          const disc = Number(item.discount || 0);
+          const lineTot = Number(item.total_price || item.total || item.subtotal || (qty * price - disc));
+          const taxAmt = Number(item.tax !== undefined && item.tax !== null && Number(item.tax) > 0 ? item.tax : (lineTot * 0.15));
+          return {
+            productName: item.product?.name || item.product_name || (isRtl ? 'صنف غير محدد' : 'General Item'),
+            productCode: item.product?.product_code || item.product?.code || '-',
+            quantity: qty,
+            unitCode: isRtl ? 'وحدة' : 'Unit',
+            price: price,
+            discount: disc,
+            taxAmount: taxAmt,
+            total: lineTot
+          };
+        })
       });
     } catch (err) {
       console.error('Failed to load items for printing:', err);

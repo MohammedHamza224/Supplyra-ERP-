@@ -37,19 +37,71 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
   };
 
   const currency = isAr ? 'ر.س' : 'SAR';
-  const subtotal = Number(data.subtotal || data.items.reduce((s, i) => s + (Number(i.total) || 0), 0));
-  const discount = Number(data.discount || 0);
+
+  // Robust item line totals & subtotal calculation
+  const computedItems = (data.items || []).map((item, idx) => {
+    const qty = Number(item.quantity || 0);
+    const price = Number(item.price || 0);
+    const disc = Number(item.discount || 0);
+    const lineSubtotal = Math.max(0, (qty * price) - disc);
+    const taxAmt = item.taxAmount !== undefined && Number(item.taxAmount) > 0 
+      ? Number(item.taxAmount) 
+      : Number((lineSubtotal * (company.vatRate / 100)).toFixed(2));
+    const rawTot = Number(item.total || 0);
+    const lineTotal = rawTot > 0 ? rawTot : lineSubtotal;
+
+    return {
+      ...item,
+      quantity: qty,
+      price: price,
+      discount: disc,
+      taxAmount: taxAmt,
+      computedSubtotal: lineSubtotal,
+      computedTotal: lineTotal
+    };
+  });
+
+  const itemsSubtotalSum = computedItems.reduce((acc, it) => acc + it.computedSubtotal, 0);
+  const rawSubtotal = Number(data.subtotal || 0);
+  const subtotal = rawSubtotal > 0 ? rawSubtotal : (itemsSubtotalSum > 0 ? itemsSubtotalSum : Number(data.grandTotal || 0));
+
+  const rawDiscount = Number(data.discount || 0);
+  const rawGrandTotal = Number(data.grandTotal || 0);
+  const calculatedTax = Number(data.tax !== undefined && data.tax !== null && Number(data.tax) > 0 
+    ? data.tax 
+    : (Math.max(0, subtotal - rawDiscount) * (company.vatRate / 100)));
+
+  // Implied discount detection: if subtotal + tax > grandTotal, deduce applied discount
+  const impliedDiscount = (rawGrandTotal > 0 && (subtotal + calculatedTax - rawGrandTotal) > 0.05)
+    ? Math.round((subtotal + calculatedTax - rawGrandTotal) * 100) / 100
+    : 0;
+
+  const discount = rawDiscount > 0 ? rawDiscount : impliedDiscount;
   const taxableAmount = Math.max(0, subtotal - discount);
-  const tax = Number(data.tax !== undefined ? data.tax : (taxableAmount * (company.vatRate / 100)));
-  const grandTotal = Number(data.grandTotal || (taxableAmount + tax));
+  const tax = Number(data.tax !== undefined && data.tax !== null && Number(data.tax) > 0 
+    ? data.tax 
+    : (taxableAmount * (company.vatRate / 100)));
+  const grandTotal = rawGrandTotal > 0 ? rawGrandTotal : (taxableAmount + tax);
 
   const wordsTotal = tafqeet(grandTotal, { currency: 'SAR', language: docLanguage });
 
-  const formattedDate = data.date ? new Date(data.date).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', {
-    year: 'numeric', month: '2-digit', day: '2-digit'
-  }) : new Date().toLocaleDateString(isAr ? 'ar-SA' : 'en-US');
+  // Standard consistent date format: YYYY/MM/DD
+  const formatStandardDate = (dInput: any) => {
+    if (!dInput) {
+      const now = new Date();
+      return `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+    }
+    const d = new Date(dInput);
+    if (isNaN(d.getTime())) return String(dInput).split('T')[0];
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}/${m}/${day}`;
+  };
 
-  // QR Code
+  const formattedDate = formatStandardDate(data.date);
+
+  // ZATCA QR Code (Official TLV Format)
   let qrSvgString = '';
   if (company.autoTaxQr) {
     const tlvBase64 = generateZatcaTlvBase64({
@@ -59,13 +111,21 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
       totalAmount: grandTotal,
       vatAmount: tax
     });
-    qrSvgString = generateQrSvg(tlvBase64, format === 'THERMAL_80MM' ? 120 : 100);
+    qrSvgString = generateQrSvg(tlvBase64, format === 'THERMAL_80MM' ? 120 : 96);
   }
 
   const handlePrint = () => {
     setPrinting(true);
     const invoiceToPrint: InvoiceData = {
       ...data,
+      subtotal,
+      discount,
+      tax,
+      grandTotal,
+      items: computedItems.map(it => ({
+        ...it,
+        total: it.computedTotal
+      })),
       type: docType,
       layoutFormat: format
     };
@@ -78,104 +138,105 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.75)',
-        backdropFilter: 'blur(5px)',
-        zIndex: 10000,
+        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 99999,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '16px',
+        padding: '12px',
         direction: isAr ? 'rtl' : 'ltr',
-        fontFamily: isAr ? "'Segoe UI', Tahoma, sans-serif" : "'Inter', sans-serif"
+        fontFamily: isAr ? "'Segoe UI', Tahoma, Arial, sans-serif" : "'Inter', system-ui, sans-serif"
       }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div 
         style={{
           width: '100%',
-          maxWidth: '1050px',
-          maxHeight: '94vh',
-          backgroundColor: 'var(--color-surface, #ffffff)',
+          maxWidth: '1020px',
+          height: 'min(94vh, 920px)',
+          backgroundColor: '#0f172a',
           borderRadius: '14px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.75)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          border: '1px solid var(--color-border, #e2e8f0)'
+          border: '1px solid #334155'
         }}
       >
-        {/* Top Action & Control Bar */}
+        {/* Top Control Bar */}
         <div 
           style={{
             padding: '12px 20px',
-            borderBottom: '1px solid var(--color-border, #e2e8f0)',
+            borderBottom: '1px solid #334155',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: 'var(--color-background, #f8fafc)',
+            backgroundColor: '#1e293b',
             flexWrap: 'wrap',
-            gap: '12px'
+            gap: '12px',
+            flexShrink: 0
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#ecfdf5', color: '#047857', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#059669', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(5, 150, 105, 0.35)' }}>
               <Printer size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--color-text-primary, #0f172a)' }}>
-                {isAr ? 'معاينة وطباعة المستند' : 'Document Print Preview'}
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#f8fafc' }}>
+                {isAr ? 'معاينة وطباعة الفاتورة والمستند' : 'Document Print Preview'}
               </h2>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #64748b)' }}>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                 #{data.invoiceNumber} • {company.companyName}
               </span>
             </div>
           </div>
 
           {/* Quick Customization Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             {/* Format Toggle (A4 vs Thermal) */}
-            <div style={{ display: 'inline-flex', backgroundColor: 'var(--color-surface, #ffffff)', borderRadius: '8px', padding: '3px', border: '1px solid var(--color-border, #cbd5e1)' }}>
+            <div style={{ display: 'inline-flex', backgroundColor: '#0f172a', borderRadius: '8px', padding: '3px', border: '1px solid #334155' }}>
               <button
                 type="button"
                 onClick={() => setFormat('A4')}
                 style={{
-                  padding: '5px 12px',
+                  padding: '6px 14px',
                   borderRadius: '6px',
                   border: 'none',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
                   cursor: 'pointer',
-                  backgroundColor: format === 'A4' ? '#047857' : 'transparent',
-                  color: format === 'A4' ? '#ffffff' : 'var(--color-text-secondary, #475569)',
+                  backgroundColor: format === 'A4' ? '#059669' : 'transparent',
+                  color: format === 'A4' ? '#ffffff' : '#94a3b8',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '6px',
                   transition: 'all 0.15s ease'
                 }}
               >
-                <FileText size={14} />
+                <FileText size={15} />
                 <span>A4</span>
               </button>
               <button
                 type="button"
                 onClick={() => setFormat('THERMAL_80MM')}
                 style={{
-                  padding: '5px 12px',
+                  padding: '6px 14px',
                   borderRadius: '6px',
                   border: 'none',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
                   cursor: 'pointer',
-                  backgroundColor: format === 'THERMAL_80MM' ? '#047857' : 'transparent',
-                  color: format === 'THERMAL_80MM' ? '#ffffff' : 'var(--color-text-secondary, #475569)',
+                  backgroundColor: format === 'THERMAL_80MM' ? '#059669' : 'transparent',
+                  color: format === 'THERMAL_80MM' ? '#ffffff' : '#94a3b8',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '6px',
                   transition: 'all 0.15s ease'
                 }}
               >
-                <Receipt size={14} />
+                <Receipt size={15} />
                 <span>{isAr ? 'حراري 80مم' : 'Thermal 80mm'}</span>
               </button>
             </div>
@@ -185,21 +246,21 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
               type="button"
               onClick={() => setDocLanguage(prev => prev === 'ar' ? 'en' : 'ar')}
               style={{
-                padding: '6px 12px',
+                padding: '6px 14px',
                 borderRadius: '8px',
-                border: '1px solid var(--color-border, #cbd5e1)',
-                backgroundColor: 'var(--color-surface, #ffffff)',
-                fontSize: '0.8rem',
+                border: '1px solid #334155',
+                backgroundColor: '#0f172a',
+                fontSize: '0.82rem',
                 fontWeight: 600,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                color: 'var(--color-text-primary, #0f172a)'
+                gap: '6px',
+                color: '#f8fafc'
               }}
               title={isAr ? 'التبديل إلى الإنجليزية' : 'Switch to Arabic'}
             >
-              <Globe size={14} />
+              <Globe size={15} />
               <span>{docLanguage === 'ar' ? 'English' : 'عربي'}</span>
             </button>
 
@@ -209,23 +270,23 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
               onClick={handlePrint}
               disabled={printing}
               style={{
-                padding: '7px 18px',
+                padding: '8px 22px',
                 borderRadius: '8px',
                 border: 'none',
-                backgroundColor: '#047857',
+                backgroundColor: '#059669',
                 color: '#ffffff',
-                fontSize: '0.85rem',
-                fontWeight: 700,
+                fontSize: '0.88rem',
+                fontWeight: 800,
                 cursor: printing ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 4px rgba(4, 120, 87, 0.25)',
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.4)',
                 transition: 'all 0.15s ease'
               }}
             >
-              <Printer size={16} />
-              <span>{printing ? (isAr ? 'جاري الإرسال...' : 'Sending...') : (isAr ? 'طباعة المستند' : 'Print Now')}</span>
+              <Printer size={17} />
+              <span>{printing ? (isAr ? 'جاري الإرسال...' : 'Printing...') : (isAr ? 'طباعة الفاتورة' : 'Print Invoice')}</span>
             </button>
 
             {/* Close Button */}
@@ -233,17 +294,19 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
               type="button"
               onClick={onClose}
               style={{
-                width: '34px',
-                height: '34px',
+                width: '36px',
+                height: '36px',
                 borderRadius: '8px',
-                border: '1px solid var(--color-border, #cbd5e1)',
-                backgroundColor: 'var(--color-surface, #ffffff)',
+                border: '1px solid #334155',
+                backgroundColor: '#0f172a',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                color: 'var(--color-text-muted, #64748b)'
+                color: '#94a3b8',
+                transition: 'all 0.15s ease'
               }}
+              title={isAr ? 'إغلاق' : 'Close'}
             >
               <X size={18} />
             </button>
@@ -255,8 +318,8 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '24px 16px',
-            backgroundColor: '#64748b20',
+            padding: '28px 16px',
+            backgroundColor: '#0b1120',
             display: 'flex',
             justifyContent: 'center'
           }}
@@ -266,11 +329,11 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
             <div 
               style={{
                 width: '100%',
-                maxWidth: '780px',
+                maxWidth: '820px',
                 backgroundColor: '#ffffff',
                 borderRadius: '6px',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0,0,0,0.06)',
-                padding: '32px 36px',
+                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.5), 0 3px 10px rgba(0,0,0,0.15)',
+                padding: '36px 40px',
                 color: '#0f172a',
                 fontSize: '11.5px',
                 lineHeight: 1.45,
@@ -278,137 +341,155 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
               }}
             >
               {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2.5px solid #047857', paddingBottom: '14px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2.5px solid #047857', paddingBottom: '16px', marginBottom: '18px' }}>
                 <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
                   {company.logoUrl ? (
                     <img src={company.logoUrl} alt="Logo" style={{ width: '64px', height: '64px', objectFit: 'contain' }} />
                   ) : (
-                    <div style={{ width: '58px', height: '58px', borderRadius: '8px', background: 'linear-gradient(135deg, #047857, #10b981)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800 }}>S</div>
+                    <div style={{ width: '56px', height: '56px', borderRadius: '8px', background: 'linear-gradient(135deg, #047857, #10b981)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 800 }}>S</div>
                   )}
                   <div>
-                    <h1 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 3px 0', color: '#047857' }}>{company.companyName}</h1>
+                    <h1 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 3px 0', color: '#047857' }}>{company.companyName}</h1>
                     <p style={{ margin: '1px 0', fontSize: '10.5px', color: '#475569' }}>{company.tagline}</p>
                     <p style={{ margin: '1px 0', fontSize: '10px', color: '#64748b' }}>{company.address} • هاتف: {company.phone}</p>
-                    <div style={{ marginTop: '4px', fontSize: '10px', fontWeight: 600 }}>
+                    <div style={{ marginTop: '4px', fontSize: '10px', fontWeight: 600, color: '#1e293b' }}>
                       الرقم الضريبي: <strong>{company.taxNumber}</strong> • السجل التجاري: <strong>{company.commercialRegister}</strong>
                     </div>
                   </div>
                 </div>
 
                 <div style={{ textAlign: isAr ? 'left' : 'right' }}>
-                  <div style={{ display: 'inline-block', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '3px 10px', borderRadius: '6px', fontSize: '14px', fontWeight: 800, marginBottom: '3px' }}>
+                  <div style={{ display: 'inline-block', backgroundColor: '#ecfdf5', color: '#047857', border: '1.5px solid #059669', padding: '4px 14px', borderRadius: '6px', fontSize: '14px', fontWeight: 800, marginBottom: '4px' }}>
                     {isAr ? 'فاتورة ضريبية' : 'TAX INVOICE'}
                   </div>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{data.invoiceNumber}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>{data.invoiceNumber}</div>
                 </div>
               </div>
 
               {/* Info Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '12px', marginBottom: '16px' }}>
-                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px 14px' }}>
-                  <div style={{ fontWeight: 700, color: '#047857', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '4px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '14px', marginBottom: '18px' }}>
+                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '12px 14px' }}>
+                  <div style={{ fontWeight: 700, color: '#047857', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px', marginBottom: '6px', fontSize: '11px' }}>
                     {isAr ? 'بيانات العميل / الطرف الآخر' : 'Customer Information'}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '3px 0' }}>
                     <span style={{ color: '#64748b' }}>{isAr ? 'الاسم:' : 'Name:'}</span>
-                    <strong>{data.entityName || (isAr ? 'عميل نقدي' : 'Cash Customer')}</strong>
+                    <strong style={{ color: '#0f172a' }}>{data.entityName || (isAr ? 'عميل نقدي' : 'Cash Customer')}</strong>
                   </div>
                   {data.entityTaxNumber && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '3px 0' }}>
                       <span style={{ color: '#64748b' }}>{isAr ? 'الرقم الضريبي:' : 'Tax No:'}</span>
-                      <strong>{data.entityTaxNumber}</strong>
+                      <strong style={{ color: '#0f172a' }}>{data.entityTaxNumber}</strong>
                     </div>
                   )}
                   {data.entityPhone && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '3px 0' }}>
                       <span style={{ color: '#64748b' }}>{isAr ? 'الهاتف:' : 'Phone:'}</span>
                       <span>{data.entityPhone}</span>
                     </div>
                   )}
+                  {data.entityAddress && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '3px 0' }}>
+                      <span style={{ color: '#64748b' }}>{isAr ? 'العنوان:' : 'Address:'}</span>
+                      <span>{data.entityAddress}</span>
+                    </div>
+                  )}
                 </div>
 
-                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px 14px' }}>
-                  <div style={{ fontWeight: 700, color: '#047857', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '4px' }}>
+                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '12px 14px' }}>
+                  <div style={{ fontWeight: 700, color: '#047857', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px', marginBottom: '6px', fontSize: '11px' }}>
                     {isAr ? 'بيانات المستند' : 'Document Details'}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '3px 0' }}>
                     <span style={{ color: '#64748b' }}>{isAr ? 'تاريخ الإصدار:' : 'Issue Date:'}</span>
-                    <strong>{formattedDate}</strong>
+                    <strong style={{ color: '#0f172a', fontFamily: 'monospace', fontSize: '11px' }}>{formattedDate}</strong>
                   </div>
                   {data.warehouseName && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '3px 0' }}>
                       <span style={{ color: '#64748b' }}>{isAr ? 'المستودع:' : 'Warehouse:'}</span>
                       <span>{data.warehouseName}</span>
                     </div>
                   )}
                   {data.paymentMethod && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '3px 0' }}>
                       <span style={{ color: '#64748b' }}>{isAr ? 'طريقة الدفع:' : 'Payment:'}</span>
-                      <span>{data.paymentMethod}</span>
+                      <span style={{ fontWeight: 600 }}>{data.paymentMethod}</span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Items Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', fontSize: '11px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px', fontSize: '11px' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>
-                    <th style={{ padding: '6px 8px', textAlign: 'center', width: '25px' }}>#</th>
-                    <th style={{ padding: '6px 8px', textAlign: isAr ? 'right' : 'left' }}>{isAr ? 'الصنف والوصف' : 'Item Description'}</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'center', width: '55px' }}>{isAr ? 'الكمية' : 'Qty'}</th>
-                    <th style={{ padding: '6px 8px', textAlign: isAr ? 'left' : 'right', width: '75px' }}>{isAr ? 'السعر' : 'Price'}</th>
-                    <th style={{ padding: '6px 8px', textAlign: isAr ? 'left' : 'right', width: '65px' }}>{isAr ? 'الضريبة' : 'VAT'}</th>
-                    <th style={{ padding: '6px 8px', textAlign: isAr ? 'left' : 'right', width: '90px' }}>{isAr ? 'الإجمالي' : 'Total'}</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'center', width: '28px' }}>#</th>
+                    <th style={{ padding: '8px 8px', width: '90px', textAlign: 'center' }}>{isAr ? 'الكود' : 'Code'}</th>
+                    <th style={{ padding: '8px 10px', textAlign: isAr ? 'right' : 'left' }}>{isAr ? 'اسم الصنف والوصف' : 'Item Description'}</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'center', width: '55px' }}>{isAr ? 'الكمية' : 'Qty'}</th>
+                    <th style={{ padding: '8px 10px', textAlign: isAr ? 'left' : 'right', width: '80px' }}>{isAr ? 'سعر الوحدة' : 'Unit Price'}</th>
+                    <th style={{ padding: '8px 10px', textAlign: isAr ? 'left' : 'right', width: '75px' }}>{isAr ? 'الضريبة (15%)' : 'VAT (15%)'}</th>
+                    <th style={{ padding: '8px 10px', textAlign: isAr ? 'left' : 'right', width: '95px' }}>{isAr ? 'المجموع' : 'Total'}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((item, idx) => (
+                  {computedItems.map((item, idx) => (
                     <tr key={idx} style={{ backgroundColor: idx % 2 === 1 ? '#f8fafc' : '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '6px 8px', textAlign: 'center' }}>{idx + 1}</td>
-                      <td style={{ padding: '6px 8px' }}>
-                        <strong>{item.productName}</strong>
-                        {item.productCode && <span style={{ color: '#64748b', fontSize: '9.5px', display: 'block' }}>{item.productCode}</span>}
+                      <td style={{ padding: '8px 8px', textAlign: 'center' }}>{idx + 1}</td>
+                      <td style={{ padding: '8px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '10px', color: '#64748b' }}>
+                        {item.productCode || '-'}
                       </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'center' }}><strong>{item.quantity}</strong></td>
-                      <td style={{ padding: '6px 8px', textAlign: isAr ? 'left' : 'right' }}>{Number(item.price || 0).toFixed(2)}</td>
-                      <td style={{ padding: '6px 8px', textAlign: isAr ? 'left' : 'right' }}>{Number(item.taxAmount || ((item.price * item.quantity) * (company.vatRate / 100))).toFixed(2)}</td>
-                      <td style={{ padding: '6px 8px', textAlign: isAr ? 'left' : 'right' }}><strong>{Number(item.total || 0).toFixed(2)} {currency}</strong></td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <strong style={{ color: '#0f172a' }}>{item.productName}</strong>
+                        {item.categoryName && <span style={{ color: '#64748b', fontSize: '9.5px', display: 'block', marginTop: '1px' }}>{item.categoryName}</span>}
+                      </td>
+                      <td style={{ padding: '8px 8px', textAlign: 'center' }}><strong>{item.quantity}</strong></td>
+                      <td style={{ padding: '8px 10px', textAlign: isAr ? 'left' : 'right' }}>{item.price.toFixed(2)}</td>
+                      <td style={{ padding: '8px 10px', textAlign: isAr ? 'left' : 'right' }}>{item.taxAmount.toFixed(2)}</td>
+                      <td style={{ padding: '8px 10px', textAlign: isAr ? 'left' : 'right' }}>
+                        <strong style={{ color: '#047857' }}>{item.computedTotal.toFixed(2)} {currency}</strong>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
 
               {/* Summary & QR Code */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <div style={{ flex: 1, display: 'flex', gap: '12px', alignItems: 'center', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '18px' }}>
+                <div style={{ flex: 1, display: 'flex', gap: '14px', alignItems: 'center', backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                   {qrSvgString && (
-                    <div style={{ width: '90px', height: '90px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', padding: '2px', borderRadius: '4px', border: '1px solid #cbd5e1' }} dangerouslySetInnerHTML={{ __html: qrSvgString }} />
+                    <div style={{ width: '96px', height: '96px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1', flexShrink: 0 }} dangerouslySetInnerHTML={{ __html: qrSvgString }} />
                   )}
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: '10px', color: '#047857', fontWeight: 700 }}>{isAr ? 'المبلغ المستحق كتابةً:' : 'Amount in words:'}</span>
-                    <div style={{ backgroundColor: '#ffffff', border: '1px dashed #cbd5e1', padding: '6px 8px', borderRadius: '4px', fontWeight: 600, fontSize: '10px', marginTop: '3px' }}>
+                    <span style={{ fontSize: '10.5px', color: '#047857', fontWeight: 700 }}>{isAr ? 'المبلغ المستحق كتابةً:' : 'Amount in words:'}</span>
+                    <div style={{ backgroundColor: '#ffffff', border: '1px dashed #cbd5e1', padding: '8px 10px', borderRadius: '4px', fontWeight: 600, fontSize: '10.5px', marginTop: '4px', color: '#0f172a', lineHeight: 1.5 }}>
                       {wordsTotal}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ width: '270px', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#ffffff' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', borderBottom: '1px solid #f1f5f9', fontSize: '10.5px' }}>
-                    <span>{isAr ? 'المجموع قبل الضريبة:' : 'Subtotal:'}</span>
+                <div style={{ width: '290px', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid #f1f5f9', fontSize: '11px' }}>
+                    <span style={{ color: '#475569' }}>{isAr ? 'المجموع قبل الضريبة:' : 'Subtotal:'}</span>
                     <strong>{subtotal.toFixed(2)} {currency}</strong>
                   </div>
                   {discount > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', borderBottom: '1px solid #f1f5f9', fontSize: '10.5px', color: '#dc2626' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid #f1f5f9', fontSize: '11px', color: '#dc2626' }}>
                       <span>{isAr ? 'الخصم:' : 'Discount:'}</span>
                       <strong>-{discount.toFixed(2)} {currency}</strong>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', borderBottom: '1px solid #f1f5f9', fontSize: '10.5px' }}>
-                    <span>{isAr ? `ضريبة القيمة المضافة (${company.vatRate}%):` : `VAT (${company.vatRate}%):`}</span>
+                  {discount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid #f1f5f9', fontSize: '11px', color: '#475569' }}>
+                      <span>{isAr ? 'الوعاء الخاضع للضريبة:' : 'Taxable Amount:'}</span>
+                      <strong>{taxableAmount.toFixed(2)} {currency}</strong>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid #f1f5f9', fontSize: '11px' }}>
+                    <span style={{ color: '#475569' }}>{isAr ? `ضريبة القيمة المضافة (${company.vatRate}%):` : `VAT (${company.vatRate}%):`}</span>
                     <strong>{tax.toFixed(2)} {currency}</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 10px', backgroundColor: '#ecfdf5', color: '#047857', fontWeight: 800, fontSize: '13px', borderTop: '2px solid #047857' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#ecfdf5', color: '#047857', fontWeight: 800, fontSize: '13.5px', borderTop: '2px solid #047857' }}>
                     <span>{isAr ? 'الإجمالي النهائي:' : 'Grand Total:'}</span>
                     <span>{grandTotal.toFixed(2)} {currency}</span>
                   </div>
@@ -418,15 +499,15 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
               {/* Signatures */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '10px', color: '#64748b' }}>
                 <div style={{ width: '28%' }}>
-                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '35px' }}>{isAr ? 'توقيع المستلم' : 'Receiver'}</div>
+                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '32px' }}>{isAr ? 'توقيع المستلم' : 'Receiver'}</div>
                   <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '4px' }}>{isAr ? 'الاسم والتوقيع' : 'Name & Sign'}</div>
                 </div>
                 <div style={{ width: '28%' }}>
-                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '35px' }}>{isAr ? 'مسؤول المبيعات' : 'Sales Representative'}</div>
+                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '32px' }}>{isAr ? 'مسؤول المبيعات' : 'Sales Representative'}</div>
                   <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '4px' }}>{data.creatorName || (isAr ? 'المسؤول المعتمد' : 'Authorized Sign')}</div>
                 </div>
                 <div style={{ width: '28%' }}>
-                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '35px' }}>{isAr ? 'الختم الرسمي' : 'Official Stamp'}</div>
+                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '32px' }}>{isAr ? 'الختم الرسمي' : 'Official Stamp'}</div>
                   <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '4px' }}>{company.companyName}</div>
                 </div>
               </div>
@@ -438,7 +519,7 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
                 width: '320px',
                 backgroundColor: '#ffffff',
                 borderRadius: '4px',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.4)',
                 padding: '16px',
                 color: '#000000',
                 fontFamily: "'Courier New', Courier, monospace",
@@ -460,25 +541,25 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '4px' }}>
                 <span>التاريخ: {formattedDate}</span>
-                <span>العميل: {data.entityName || 'نقدي'}</span>
+                <span>العميل: {data.entityName || (isAr ? 'نقدي' : 'Cash')}</span>
               </div>
 
               <table style={{ width: '100%', borderTop: '1px dashed #000', borderBottom: '1px dashed #000', margin: '6px 0', fontSize: '10px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #000' }}>
-                    <th style={{ textAlign: isAr ? 'right' : 'left', padding: '2px 0' }}>الصنف</th>
-                    <th style={{ textAlign: 'center', padding: '2px 0' }}>الكمية</th>
-                    <th style={{ textAlign: isAr ? 'left' : 'right', padding: '2px 0' }}>السعر</th>
-                    <th style={{ textAlign: isAr ? 'left' : 'right', padding: '2px 0' }}>الإجمالي</th>
+                    <th style={{ textAlign: isAr ? 'right' : 'left', padding: '2px 0' }}>{isAr ? 'الصنف' : 'Item'}</th>
+                    <th style={{ textAlign: 'center', padding: '2px 0' }}>{isAr ? 'الكمية' : 'Qty'}</th>
+                    <th style={{ textAlign: isAr ? 'left' : 'right', padding: '2px 0' }}>{isAr ? 'السعر' : 'Price'}</th>
+                    <th style={{ textAlign: isAr ? 'left' : 'right', padding: '2px 0' }}>{isAr ? 'المجموع' : 'Total'}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((item, idx) => (
+                  {computedItems.map((item, idx) => (
                     <tr key={idx}>
                       <td style={{ padding: '2px 0' }}>{item.productName}</td>
                       <td style={{ textAlign: 'center', padding: '2px 0' }}>{item.quantity}</td>
-                      <td style={{ textAlign: isAr ? 'left' : 'right', padding: '2px 0' }}>{Number(item.price || 0).toFixed(2)}</td>
-                      <td style={{ textAlign: isAr ? 'left' : 'right', padding: '2px 0' }}><strong>{Number(item.total || 0).toFixed(2)}</strong></td>
+                      <td style={{ textAlign: isAr ? 'left' : 'right', padding: '2px 0' }}>{item.price.toFixed(2)}</td>
+                      <td style={{ textAlign: isAr ? 'left' : 'right', padding: '2px 0' }}><strong>{item.computedTotal.toFixed(2)}</strong></td>
                     </tr>
                   ))}
                 </tbody>
@@ -486,15 +567,21 @@ export const DocumentPrintModal: React.FC<DocumentPrintModalProps> = ({
 
               <div style={{ borderBottom: '1px dashed #000', paddingBottom: '4px', marginBottom: '6px', fontSize: '10.5px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-                  <span>المجموع قبل الضريبة:</span>
+                  <span>{isAr ? 'المجموع قبل الضريبة:' : 'Subtotal:'}</span>
                   <span>{subtotal.toFixed(2)} {currency}</span>
                 </div>
+                {discount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0', color: '#dc2626' }}>
+                    <span>{isAr ? 'الخصم:' : 'Discount:'}</span>
+                    <span>-{discount.toFixed(2)} {currency}</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-                  <span>ضريبة القيمة المضافة ({company.vatRate}%):</span>
+                  <span>{isAr ? `ضريبة القيمة المضافة (${company.vatRate}%):` : `VAT (${company.vatRate}%):`}</span>
                   <span>{tax.toFixed(2)} {currency}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', margin: '3px 0', borderTop: '1px solid #000', paddingTop: '3px', fontWeight: 900, fontSize: '12px' }}>
-                  <span>الإجمالي النهائي:</span>
+                  <span>{isAr ? 'الإجمالي النهائي:' : 'Grand Total:'}</span>
                   <span>{grandTotal.toFixed(2)} {currency}</span>
                 </div>
               </div>
