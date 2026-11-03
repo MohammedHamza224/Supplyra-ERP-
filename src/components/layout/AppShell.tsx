@@ -10,6 +10,8 @@ import { useTranslation } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { useAuth, usePermission } from '../../contexts/AuthContext';
+import { prefetchRoute } from '../../lib/routePrefetch';
+import { MasterDataService } from '../../services/masterDataService';
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
@@ -68,6 +70,19 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isMobileDrawerOpen]);
+
+  // Background preloading of master data for zero-delay form & screen interactions
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(() => {
+        MasterDataService.preloadAll();
+      });
+    } else {
+      setTimeout(() => {
+        MasterDataService.preloadAll();
+      }, 500);
+    }
+  }, []);
 
   const toggleDesktopCollapse = () => {
     setIsDesktopCollapsed(prev => {
@@ -270,6 +285,8 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                         <li key={item.path} style={{ padding: showText ? '0 12px' : '0 8px' }}>
                           <Link 
                             to={item.path} 
+                            onMouseEnter={() => prefetchRoute(item.path)}
+                            onTouchStart={() => prefetchRoute(item.path)}
                             style={{ 
                               padding: showText ? '7px 12px' : '7px 0', 
                               minHeight: '38px',

@@ -7,24 +7,16 @@ import { Plus, Edit2, Trash2, Search, X, Package, CheckCircle, XCircle } from 'l
 import { useDebounce } from '../../hooks/useDebounce';
 import ProductSuppliers from './ProductSuppliers';
 import LOVSelect from '../../components/ui/LOVSelect';
+import { cacheGet, fetchWithCache, invalidateCache, CACHE_KEYS } from '../../lib/dataCache';
+import { MasterDataService } from '../../services/masterDataService';
 
 const ProductsList = () => {
   const { t, language } = useTranslation();
   const isRtl = language === 'ar';
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const [products, setProducts] = useState<any[]>([]);
-
-  // STEP 2: VERIFY React state updates
-  useEffect(() => {
-    console.log('CURRENT PRODUCTS STATE:', products);
-  }, [products]);
-
-  useEffect(() => {
-    // DIAGNOSTICS COMPLETE
-  }, []);
-
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<any[]>(() => cacheGet(CACHE_KEYS.PRODUCTS) || []);
+  const [loading, setLoading] = useState(() => !cacheGet(CACHE_KEYS.PRODUCTS));
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -98,7 +90,11 @@ const ProductsList = () => {
         }
         
         setDeleteConfirmId(null);
-        fetchProducts();
+        invalidateCache(CACHE_KEYS.PRODUCTS);
+        invalidateCache(CACHE_KEYS.INVENTORY);
+        invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+        invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+        fetchProducts(true);
       } catch(e: any) {
          setDeleteErrorMsg(e.message);
       } finally {
@@ -106,112 +102,74 @@ const ProductsList = () => {
       }
     };
 
-    const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('products')
-        .select(`
-          id, product_code, name, purchase_price, selling_price, active, min_stock, barcode,
-          category_id, brand_id, unit_id, created_at,
-          category:categories(name),
-          brand:brands(name),
-          unit:units(code),
-          product_suppliers(supplier_id, is_preferred, suppliers(name))
-        `).eq('active', true)
-        .order('created_at', { ascending: false });
-
-      if (debouncedSearchTerm) {
-        query = query.or(`name.ilike.%${debouncedSearchTerm}%,product_code.ilike.%${debouncedSearchTerm}%`);
+    const fetchProducts = async (forceRefresh = false) => {
+      if (!cacheGet(CACHE_KEYS.PRODUCTS) || forceRefresh) {
+        setLoading(true);
       }
+      try {
+        const fetcher = async () => {
+          let query = supabase
+            .from('products')
+            .select(`
+              id, product_code, name, purchase_price, selling_price, active, min_stock, barcode,
+              category_id, brand_id, unit_id, created_at,
+              category:categories(name),
+              brand:brands(name),
+              unit:units(code),
+              product_suppliers(supplier_id, is_preferred, suppliers(name))
+            `).eq('active', true)
+            .order('created_at', { ascending: false });
 
-      const { data, error } = await query;
+          if (debouncedSearchTerm) {
+            query = query.or(`name.ilike.%${debouncedSearchTerm}%`);
+          }
 
-      if (error) {
-        console.error('PRODUCTS FETCH ERROR:', error);
-        setFormError(error.message);
-        throw error;
+          const { data, error } = await query;
+
+          if (error) {
+            console.error('PRODUCTS FETCH ERROR:', error);
+            setFormError(error.message);
+            throw error;
+          }
+          
+          return data || [];
+        };
+
+        if (!debouncedSearchTerm) {
+          const data = await fetchWithCache(CACHE_KEYS.PRODUCTS, fetcher, { forceRefresh });
+          setProducts(data);
+        } else {
+          const data = await fetcher();
+          setProducts(data);
+        }
+      } catch (error: any) {
+        console.error('Error fetching products:', error);
+        setFormError(error?.message || 'Error fetching products');
+      } finally {
+        setLoading(false);
       }
-      
-      setProducts(data || []);
+    };
 
-    } catch (error: any) {
-      console.error('Error fetching products:', error);
-      setFormError(error?.message || 'Error fetching products');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchFormData = async () => {
-    try {
-      const [categoriesResult, brandsResult, unitsResult, suppliersResult, warehousesResult] =
-        await Promise.all([
-          supabase
-            .from('categories')
-            .select('id, name')
-            .eq('active', true)
-            .order('name'),
-
-          supabase
-            .from('brands')
-            .select('id, name')
-            .eq('active', true)
-            .order('name'),
-
-          supabase
-            .from('units')
-            .select('id, name, code')
-            .eq('active', true)
-            .order('name'),
-
-          supabase
-            .from('suppliers')
-            .select('id, name')
-            .eq('active', true)
-            .order('name'),
-          supabase
-            .from('warehouses')
-            .select('id, name')
-            .eq('active', true)
-            .order('name'),
+    const fetchFormData = async () => {
+      try {
+        const [cats, brs, unts, sups, wars] = await Promise.all([
+          MasterDataService.getCategories(),
+          MasterDataService.getBrands(),
+          MasterDataService.getUnits(),
+          MasterDataService.getSuppliers(),
+          MasterDataService.getWarehouses()
         ]);
 
-     console.log('Categories:', categoriesResult);
-console.log('Brands:', brandsResult);
-console.log('Units:', unitsResult);
-
-if (categoriesResult.error) {
-  console.error('Categories error:', categoriesResult.error);
-}
-
-if (brandsResult.error) {
-  console.error('Brands error:', brandsResult.error);
-}
-
-if (unitsResult.error) {
-  console.error('Units error:', unitsResult.error);
-}
-
-if (
-  categoriesResult.error ||
-  brandsResult.error ||
-  unitsResult.error
-) {
-  setFormError('Failed to load product master data. Check console for details.');
-  return;
-}
-
-      setCategories(categoriesResult.data || []);
-      setBrands(brandsResult.data || []);
-      setUnits(unitsResult.data || []);
-      setSuppliers(suppliersResult.data || []);
-      setWarehouses(warehousesResult.data || []);
-    } catch (error) {
-      console.error('Error fetching product form data:', error);
-      setFormError('Failed to load categories, brands, or units.');
-    }
-  };
+        setCategories(cats || []);
+        setBrands(brs || []);
+        setUnits(unts || []);
+        setSuppliers(sups || []);
+        setWarehouses(wars || []);
+      } catch (error) {
+        console.error('Error fetching product form data:', error);
+        setFormError('Failed to load categories, brands, or units.');
+      }
+    };
 
   const openModal = async (product?: any) => {
     setFormError('');
@@ -498,8 +456,13 @@ if (
       // Clear search filter to ensure the new product isn't hidden by an active search
       setSearchTerm('');
 
+      invalidateCache(CACHE_KEYS.PRODUCTS);
+      invalidateCache(CACHE_KEYS.INVENTORY);
+      invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+      invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+
       // Refresh products from Supabase
-      await fetchProducts();
+      await fetchProducts(true);
 
       // Close modal after successful insert
       setShowModal(false);

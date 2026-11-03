@@ -10,6 +10,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area, Cell, LineChart, Line
 } from 'recharts';
 import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
+import { cacheGet, cacheSet, CACHE_KEYS, CACHE_TTL } from '../../lib/dataCache';
 
 type DateFilter = 'today' | 'week' | 'month' | 'year' | 'custom' | 'all';
 
@@ -30,10 +31,14 @@ export default function AnalyticsDashboard() {
     return d.toISOString().split('T')[0];
   });
   const [customTo, setCustomTo] = useState<string>(() => new Date().toISOString().split('T')[0]);
-  const [loading, setLoading] = useState(true);
+
+  const defaultCacheKey = `${CACHE_KEYS.ANALYTICS_PREFIX}month_${customFrom}_${customTo}`;
+  const initialCache = cacheGet<any>(defaultCacheKey);
+
+  const [loading, setLoading] = useState(() => !initialCache);
 
   // Executive KPIs
-  const [kpis, setKpis] = useState({
+  const [kpis, setKpis] = useState(() => initialCache?.kpis || {
     totalSales: 0,
     salesCount: 0,
     totalPurchases: 0,
@@ -51,21 +56,40 @@ export default function AnalyticsDashboard() {
   });
 
   // Ranking & Breakdown Data
-  const [purchaseTrends, setPurchaseTrends] = useState<any[]>([]);
-  const [topProducts, setTopProducts] = useState<any[]>([]);
-  const [topCustomers, setTopCustomers] = useState<any[]>([]);
-  const [topSuppliers, setTopSuppliers] = useState<any[]>([]);
-  const [categorySales, setCategorySales] = useState<any[]>([]);
-  const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
-  const [expiringBatches, setExpiringBatches] = useState<any[]>([]);
-  const [insights, setInsights] = useState<BusinessInsight[]>([]);
+  const [purchaseTrends, setPurchaseTrends] = useState<any[]>(() => initialCache?.purchaseTrends || []);
+  const [topProducts, setTopProducts] = useState<any[]>(() => initialCache?.topProducts || []);
+  const [topCustomers, setTopCustomers] = useState<any[]>(() => initialCache?.topCustomers || []);
+  const [topSuppliers, setTopSuppliers] = useState<any[]>(() => initialCache?.topSuppliers || []);
+  const [categorySales, setCategorySales] = useState<any[]>(() => initialCache?.categorySales || []);
+  const [lowStockProducts, setLowStockProducts] = useState<any[]>(() => initialCache?.lowStockProducts || []);
+  const [expiringBatches, setExpiringBatches] = useState<any[]>(() => initialCache?.expiringBatches || []);
+  const [insights, setInsights] = useState<BusinessInsight[]>(() => initialCache?.insights || []);
 
   useEffect(() => {
     fetchAnalytics();
-  }, [dateFilter]);
+  }, [dateFilter, customFrom, customTo]);
 
-  const fetchAnalytics = async () => {
-    setLoading(true);
+  const fetchAnalytics = async (forceRefresh = false) => {
+    const cacheKey = `${CACHE_KEYS.ANALYTICS_PREFIX}${dateFilter}_${customFrom}_${customTo}`;
+    const cached = cacheGet<any>(cacheKey);
+
+    if (cached && !forceRefresh) {
+      setKpis(cached.kpis);
+      setTopProducts(cached.topProducts);
+      setTopCustomers(cached.topCustomers);
+      setTopSuppliers(cached.topSuppliers);
+      setPurchaseTrends(cached.purchaseTrends);
+      setCategorySales(cached.categorySales);
+      setLowStockProducts(cached.lowStockProducts);
+      setExpiringBatches(cached.expiringBatches);
+      setInsights(cached.insights);
+      setLoading(false);
+      return;
+    }
+
+    if (!cached || forceRefresh) {
+      setLoading(true);
+    }
     try {
       // Determine date threshold
       const now = new Date();
@@ -392,7 +416,7 @@ export default function AnalyticsDashboard() {
       }
 
       // Update States
-      setKpis({
+      const finalKpis = {
         totalSales: totalSalesRevenue,
         salesCount: validOrders.length,
         totalPurchases: totalPurchasesAmount,
@@ -407,8 +431,9 @@ export default function AnalyticsDashboard() {
         lowStockCount: lowStockList.length,
         expiredBatchesCount: expiredCount,
         expiringSoonCount: expiringSoonCount
-      });
+      };
 
+      setKpis(finalKpis);
       setTopProducts(sortedTopProducts);
       setTopCustomers(sortedTopCustomers);
       setTopSuppliers(sortedTopSuppliers);
@@ -417,6 +442,18 @@ export default function AnalyticsDashboard() {
       setLowStockProducts(lowStockList.slice(0, 5));
       setExpiringBatches(expiringBatchesList.slice(0, 5));
       setInsights(generatedInsights);
+
+      cacheSet(cacheKey, {
+        kpis: finalKpis,
+        topProducts: sortedTopProducts,
+        topCustomers: sortedTopCustomers,
+        topSuppliers: sortedTopSuppliers,
+        purchaseTrends: sortedPurchaseTrends,
+        categorySales: sortedCategorySales,
+        lowStockProducts: lowStockList.slice(0, 5),
+        expiringBatches: expiringBatchesList.slice(0, 5),
+        insights: generatedInsights
+      }, CACHE_TTL.ANALYTICS);
 
     } catch (err) {
       console.error('Error fetching analytics:', err);

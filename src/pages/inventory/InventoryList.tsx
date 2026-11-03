@@ -6,6 +6,8 @@ import { Search, Plus, Edit2, AlertTriangle, CircleCheck, Calendar, Clock, Packa
 import { useAuth } from '../../contexts/AuthContext';
 import { useDebounce } from '../../hooks/useDebounce';
 import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
+import { cacheGet, fetchWithCache, invalidateCache, CACHE_KEYS } from '../../lib/dataCache';
+import { MasterDataService } from '../../services/masterDataService';
 
 interface InventoryBatch {
   id: string;
@@ -31,8 +33,8 @@ const InventoryList = () => {
   const navigate = useNavigate();
   const isRtl = language === 'ar';
   
-  const [batches, setBatches] = useState<InventoryBatch[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [batches, setBatches] = useState<InventoryBatch[]>(() => cacheGet(CACHE_KEYS.INVENTORY) || []);
+  const [loading, setLoading] = useState(() => !cacheGet(CACHE_KEYS.INVENTORY));
   const [productSummary, setProductSummary] = useState<any>(null);
   const [selectedWarehouseSummary, setSelectedWarehouseSummary] = useState<any>(null);
   
@@ -69,11 +71,11 @@ const InventoryList = () => {
   });
 
   const fetchWarehouses = async () => {
-    const [wareRes, prodRes] = await Promise.all([
-      supabase.from('warehouses').select('id, name').eq('active', true),
+    const [warehousesList, prodRes] = await Promise.all([
+      MasterDataService.getWarehouses(),
       supabase.from('products').select('id, name, product_code').eq('active', true).order('name')
     ]);
-    if (wareRes.data) setWarehouses(wareRes.data);
+    if (warehousesList) setWarehouses(warehousesList);
     if (prodRes.data) setAllProducts(prodRes.data);
   };
 
@@ -112,96 +114,106 @@ const InventoryList = () => {
     }
   };
 
-  const fetchBatches = async (wFilter = warehouseFilter) => {
-    setLoading(true);
+  const fetchBatches = async (wFilter = warehouseFilter, forceRefresh = false) => {
+    if (!cacheGet(CACHE_KEYS.INVENTORY) || forceRefresh) {
+      setLoading(true);
+    }
     try {
-      let query = supabase
-        .from('inventory_batches')
-        .select(`
-          *,
-          products(name, product_code, purchase_price),
-          warehouses(name)
-        `)
-        .order('expiry_date', { ascending: true });
+      const fetcher = async () => {
+        let query = supabase
+          .from('inventory_batches')
+          .select(`
+            *,
+            products(name, product_code, purchase_price),
+            warehouses(name)
+          `)
+          .order('expiry_date', { ascending: true });
 
-      if (productId) {
-        query = query.eq('product_id', productId);
-      }
+        if (productId) {
+          query = query.eq('product_id', productId);
+        }
 
-      if (wFilter) {
-        query = query.eq('warehouse_id', wFilter);
-      }
+        if (wFilter) {
+          query = query.eq('warehouse_id', wFilter);
+        }
 
-      const { data, error } = await query;
-      if (error) {
-        console.warn('Inventory table error:', error);
-        setBatches([]);
-        return;
-      }
-      
-      const formattedData = (data || []).map((b: any) => {
-        let diffDays = 0;
-        let expDate = new Date();
-        const expStr = b.expiry_date ? String(b.expiry_date).split('T')[0] : '';
-        if (expStr) {
-          const parts = expStr.split('-').map(Number);
-          if (parts.length === 3) {
-            expDate = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const diffTime = expDate.getTime() - today.getTime();
-            diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          }
+        const { data, error } = await query;
+        if (error) {
+          console.warn('Inventory table error:', error);
+          return [];
         }
         
-        let status = 'Valid';
-        if (diffDays < 0) status = 'Expired';
-        else if (diffDays === 0) status = 'Expires Today';
-        else if (diffDays <= 30) status = 'Expiring Soon';
-
-        const qty = Number(b.quantity || 0);
-        const cost = Number(b.products?.purchase_price || 0);
-
-        // Derive sensible production date if not already set in DB
-        let prodDate = b.production_date ? String(b.production_date).split('T')[0] : '';
-        if (!prodDate) {
-          const pName = (b.products?.name || '').toLowerCase();
-          const pCode = (b.products?.product_code || '').toLowerCase();
-          let monthsBefore = 6;
-          if (pName.includes('طازج') || pName.includes('عصير') || pCode.includes('juic')) {
-            monthsBefore = 2; // ~60 days
-          } else if (pName.includes('حليب') || pCode.includes('milk')) {
-            monthsBefore = 6; // ~180 days
-          } else if (pName.includes('أرز') || pName.includes('ارز') || pCode.includes('rice')) {
-            monthsBefore = 12; // 1 year
-          } else if (pName.includes('زيت') || pCode.includes('oil')) {
-            monthsBefore = 12; // 1 year
-          } else if (pName.includes('دقيق') || pCode.includes('flor')) {
-            monthsBefore = 9; // 9 months
+        return (data || []).map((b: any) => {
+          let diffDays = 0;
+          let expDate = new Date();
+          const expStr = b.expiry_date ? String(b.expiry_date).split('T')[0] : '';
+          if (expStr) {
+            const parts = expStr.split('-').map(Number);
+            if (parts.length === 3) {
+              expDate = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const diffTime = expDate.getTime() - today.getTime();
+              diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            }
           }
-          const baseDate = expStr ? expDate : new Date();
-          const estimatedProd = new Date(baseDate);
-          estimatedProd.setMonth(estimatedProd.getMonth() - monthsBefore);
-          prodDate = estimatedProd.toISOString().split('T')[0];
-        }
+          
+          let status = 'Valid';
+          if (diffDays < 0) status = 'Expired';
+          else if (diffDays === 0) status = 'Expires Today';
+          else if (diffDays <= 30) status = 'Expiring Soon';
 
-        return {
-          ...b,
-          production_date: prodDate,
-          product_name: b.products?.name,
-          product_code: b.products?.product_code,
-          purchase_price: cost,
-          warehouse_name: b.warehouses?.name,
-          expiry_status: status,
-          days_remaining: diffDays,
-          inventory_value: qty * cost
-        };
-      });
+          const qty = Number(b.quantity || 0);
+          const cost = Number(b.products?.purchase_price || 0);
+
+          // Derive sensible production date if not already set in DB
+          let prodDate = b.production_date ? String(b.production_date).split('T')[0] : '';
+          if (!prodDate) {
+            const pName = (b.products?.name || '').toLowerCase();
+            const pCode = (b.products?.product_code || '').toLowerCase();
+            let monthsBefore = 6;
+            if (pName.includes('طازج') || pName.includes('عصير') || pCode.includes('juic')) {
+              monthsBefore = 2; // ~60 days
+            } else if (pName.includes('حليب') || pCode.includes('milk')) {
+              monthsBefore = 6; // ~180 days
+            } else if (pName.includes('أرز') || pName.includes('ارز') || pCode.includes('rice')) {
+              monthsBefore = 12; // 1 year
+            } else if (pName.includes('زيت') || pCode.includes('oil')) {
+              monthsBefore = 12; // 1 year
+            } else if (pName.includes('دقيق') || pCode.includes('flor')) {
+              monthsBefore = 9; // 9 months
+            }
+            const baseDate = expStr ? expDate : new Date();
+            const estimatedProd = new Date(baseDate);
+            estimatedProd.setMonth(estimatedProd.getMonth() - monthsBefore);
+            prodDate = estimatedProd.toISOString().split('T')[0];
+          }
+
+          return {
+            ...b,
+            production_date: prodDate,
+            product_name: b.products?.name,
+            product_code: b.products?.product_code,
+            purchase_price: cost,
+            warehouse_name: b.warehouses?.name,
+            expiry_status: status,
+            days_remaining: diffDays,
+            inventory_value: qty * cost
+          };
+        });
+      };
+
+      let formattedData: any[];
+      if (!productId && !wFilter) {
+        formattedData = await fetchWithCache(CACHE_KEYS.INVENTORY, fetcher, { forceRefresh });
+      } else {
+        formattedData = await fetcher();
+      }
 
       setBatches(formattedData);
 
       // Asynchronously backfill missing production_date to Supabase DB
-      const batchesToBackfill = (data || []).filter((b: any) => !b.production_date && b.expiry_date);
+      const batchesToBackfill = (formattedData || []).filter((b: any) => !b.production_date && b.expiry_date);
       if (batchesToBackfill.length > 0) {
         Promise.all(
           batchesToBackfill.map((b: any) => {
@@ -326,7 +338,10 @@ const InventoryList = () => {
 
       setShowModal(false);
       setFormData({ product_id: '', warehouse_id: '', batch_number: '', quantity: '', production_date: '', expiry_date: '' });
-      fetchBatches();
+      invalidateCache(CACHE_KEYS.INVENTORY);
+      invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+      invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+      fetchBatches(warehouseFilter, true);
     } catch (err: any) {
       console.error('Error saving batch:', err);
       setFormError(err.message || 'Failed to save batch');

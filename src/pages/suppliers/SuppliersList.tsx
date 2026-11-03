@@ -6,13 +6,14 @@ import { Plus, Edit2, Trash2, Search, X, Truck, Printer } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
 import SupplierProducts from './SupplierProducts';
 import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
+import { cacheGet, fetchWithCache, invalidateCache, CACHE_KEYS } from '../../lib/dataCache';
 
 const SuppliersList = () => {
   const { t, language } = useTranslation();
   const isRtl = language === 'ar';
   const { hasPermission } = useAuth();
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState<any[]>(() => cacheGet(CACHE_KEYS.SUPPLIERS) || []);
+  const [loading, setLoading] = useState(() => !cacheGet(CACHE_KEYS.SUPPLIERS));
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -83,24 +84,35 @@ const SuppliersList = () => {
     fetchSuppliers();
   }, [debouncedSearchTerm]);
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = async (forceRefresh = false) => {
     try {
       setFetchError(null);
-      setLoading(true);
-      
-      let query = supabase
-        .from('suppliers')
-        .select('*')
-        .order('name');
-
-      if (debouncedSearchTerm) {
-        query = query.or(`name.ilike.%${debouncedSearchTerm}%,contact_person.ilike.%${debouncedSearchTerm}%,phone.ilike.%${debouncedSearchTerm}%,email.ilike.%${debouncedSearchTerm}%`);
+      if (!cacheGet(CACHE_KEYS.SUPPLIERS) || forceRefresh) {
+        setLoading(true);
       }
+      
+      const fetcher = async () => {
+        let query = supabase
+          .from('suppliers')
+          .select('*')
+          .order('name');
 
-      const { data, error } = await query;
+        if (debouncedSearchTerm) {
+          query = query.or(`name.ilike.%${debouncedSearchTerm}%,contact_person.ilike.%${debouncedSearchTerm}%,phone.ilike.%${debouncedSearchTerm}%,email.ilike.%${debouncedSearchTerm}%`);
+        }
 
-      if (error) throw error;
-      setSuppliers(data || []);
+        const { data, error } = await query;
+        if (error) throw error;
+        return data || [];
+      };
+
+      if (!debouncedSearchTerm) {
+        const data = await fetchWithCache(CACHE_KEYS.SUPPLIERS, fetcher, { forceRefresh });
+        setSuppliers(data);
+      } else {
+        const data = await fetcher();
+        setSuppliers(data);
+      }
     } catch (error: any) {
       console.error('Error fetching suppliers:', error);
       setFetchError(`Failed to load suppliers: ${error.message || JSON.stringify(error)}`);

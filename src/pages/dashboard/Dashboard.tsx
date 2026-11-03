@@ -13,6 +13,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useDebounce } from '../../hooks/useDebounce';
 import SaleDetails from '../sales/SaleDetails';
 import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
+import { cacheGet, cacheSet, fetchWithCache, CACHE_KEYS, CACHE_TTL } from '../../lib/dataCache';
 import styles from './Dashboard.module.css';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -85,29 +86,45 @@ const Dashboard = () => {
   const pageSize = 7;
   const [viewingSaleId, setViewingSaleId] = useState<string | null>(null);
 
-  const [stats, setStats] = useState<DashboardStats>({
-    totalSales: 0,
-    totalOrders: 0,
-    productsCount: 0,
-    customersCount: 0,
-    suppliersCount: 0,
-    warehousesCount: 0,
-    grossProfit: 0,
-    totalPurchases: 0,
-    purchasesCount: 0,
-    avgOrderValue: 0,
-    totalQtySold: 0,
-    trendStatus: 'stable',
-    lowStockProducts: 0,
-    expiringSoonBatches: 0,
-    expiredBatches: 0,
-    customersWithReceivables: 0,
-    pendingPurchases: 0,
-    salesTrend: [],
-    topProducts: [],
-    recentActivity: []
+  const getDashboardCacheKey = (f: string, from: string, to: string) => 
+    `${CACHE_KEYS.DASHBOARD_PREFIX}${f}_${from}_${to}`;
+
+  const [stats, setStats] = useState<DashboardStats>(() => {
+    const d = new Date();
+    d.setDate(1);
+    const cFrom = d.toISOString().split('T')[0];
+    const cTo = new Date().toISOString().split('T')[0];
+    return cacheGet<DashboardStats>(`${CACHE_KEYS.DASHBOARD_PREFIX}30days_${cFrom}_${cTo}`) || {
+      totalSales: 0,
+      totalOrders: 0,
+      productsCount: 0,
+      customersCount: 0,
+      suppliersCount: 0,
+      warehousesCount: 0,
+      grossProfit: 0,
+      totalPurchases: 0,
+      purchasesCount: 0,
+      avgOrderValue: 0,
+      totalQtySold: 0,
+      trendStatus: 'stable',
+      lowStockProducts: 0,
+      expiringSoonBatches: 0,
+      expiredBatches: 0,
+      customersWithReceivables: 0,
+      pendingPurchases: 0,
+      salesTrend: [],
+      topProducts: [],
+      recentActivity: []
+    };
   });
-  const [loading, setLoading] = useState(true);
+
+  const [loading, setLoading] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    const cFrom = d.toISOString().split('T')[0];
+    const cTo = new Date().toISOString().split('T')[0];
+    return !cacheGet<DashboardStats>(`${CACHE_KEYS.DASHBOARD_PREFIX}30days_${cFrom}_${cTo}`);
+  });
 
   const getTodayFormatted = () => {
     const d = new Date();
@@ -133,8 +150,12 @@ const Dashboard = () => {
     }
   };
 
-  const fetchStats = async () => {
-    setLoading(true);
+  const fetchStats = async (forceRefresh = false) => {
+    const cacheKey = getDashboardCacheKey(filter, customFrom, customTo);
+    const cachedStats = cacheGet<DashboardStats>(cacheKey);
+    if (!cachedStats || forceRefresh) {
+      setLoading(true);
+    }
     try {
       const now = new Date();
       let fromDateStr = '';
@@ -166,25 +187,35 @@ const Dashboard = () => {
         }
       }
 
-      // Base queries for master counts and dictionaries
-      const [
-        { count: pCount },
-        { count: cCount },
-        { count: sCount },
-        { count: wCount },
-        { data: customersList },
-        { data: productsList }
-      ] = await Promise.all([
-        supabase.from('products').select('*', { count: 'exact', head: true }).eq('active', true),
-        supabase.from('customers').select('*', { count: 'exact', head: true }).eq('active', true),
-        supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('active', true),
-        supabase.from('warehouses').select('*', { count: 'exact', head: true }).eq('active', true),
-        supabase.from('customers').select('id, name, phone'),
-        supabase.from('products').select('id, name, purchase_price')
-      ]);
+      // Cached Master Counts & Dictionaries (Prevents re-querying 6 master tables on date filter change)
+      const masterCounts = await fetchWithCache('dashboard_master_counts', async () => {
+        const [
+          { count: pCount },
+          { count: cCount },
+          { count: sCount },
+          { count: wCount },
+          { data: customersList },
+          { data: productsList }
+        ] = await Promise.all([
+          supabase.from('products').select('*', { count: 'exact', head: true }).eq('active', true),
+          supabase.from('customers').select('*', { count: 'exact', head: true }).eq('active', true),
+          supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('active', true),
+          supabase.from('warehouses').select('*', { count: 'exact', head: true }).eq('active', true),
+          supabase.from('customers').select('id, name, phone'),
+          supabase.from('products').select('id, name, purchase_price')
+        ]);
+        return {
+          pCount: pCount || 0,
+          cCount: cCount || 0,
+          sCount: sCount || 0,
+          wCount: wCount || 0,
+          customersList: customersList || [],
+          productsList: productsList || []
+        };
+      }, { ttlMs: CACHE_TTL.EXTENDED, forceRefresh });
 
-      const customerMap = new Map((customersList || []).map((c: any) => [c.id, c]));
-      const productMap = new Map((productsList || []).map((p: any) => [p.id, p]));
+      const customerMap = new Map((masterCounts.customersList || []).map((c: any) => [c.id, c]));
+      const productMap = new Map((masterCounts.productsList || []).map((p: any) => [p.id, p]));
 
       const parseDateSafe = (dInput: any): Date | null => {
         if (!dInput) return null;
@@ -304,7 +335,10 @@ const Dashboard = () => {
         if (!itemsErr && itemsData) {
           orderItems = itemsData;
         } else {
-          const { data: allItems } = await supabase.from('order_items').select('*');
+          const { data: allItems } = await supabase
+            .from('order_items')
+            .select('quantity, total, product_id, order_id')
+            .limit(500);
           orderItems = (allItems || []).filter((it: any) => orderIds.includes(it.order_id));
         }
       }
@@ -387,13 +421,13 @@ const Dashboard = () => {
         });
       }
 
-      setStats({
+      const finalStats: DashboardStats = {
         totalSales,
         totalOrders,
-        productsCount: pCount || 0,
-        customersCount: cCount || 0,
-        suppliersCount: sCount || 0,
-        warehousesCount: wCount || 0,
+        productsCount: masterCounts.pCount,
+        customersCount: masterCounts.cCount,
+        suppliersCount: masterCounts.sCount,
+        warehousesCount: masterCounts.wCount,
         grossProfit,
         totalPurchases,
         purchasesCount: purchases.length,
@@ -408,7 +442,10 @@ const Dashboard = () => {
         salesTrend,
         topProducts,
         recentActivity
-      });
+      };
+
+      cacheSet(cacheKey, finalStats, CACHE_TTL.ANALYTICS);
+      setStats(finalStats);
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
     } finally {
@@ -522,7 +559,7 @@ const Dashboard = () => {
           <button 
             type="button"
             className="btn btn-secondary" 
-            onClick={fetchStats}
+            onClick={() => fetchStats(true)}
             title={language === 'ar' ? 'تحديث البيانات' : 'Refresh Data'}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', minHeight: '38px', padding: '0 14px' }}
           >
@@ -1065,7 +1102,7 @@ const Dashboard = () => {
               </div>
               <button
                 type="button"
-                onClick={fetchStats}
+                onClick={() => fetchStats(true)}
                 className={styles.applyDateBtn}
               >
                 <CheckCircle size={14} />

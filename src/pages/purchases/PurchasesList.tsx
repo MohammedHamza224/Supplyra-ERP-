@@ -7,14 +7,15 @@ import PurchaseForm from './PurchaseForm';
 import PurchaseDetails from './PurchaseDetails';
 import { useDebounce } from '../../hooks/useDebounce';
 import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
+import { cacheGet, fetchWithCache, invalidateCache, CACHE_KEYS } from '../../lib/dataCache';
 
 const PurchasesList = () => {
   const { t, language } = useTranslation();
   const isRtl = language === 'ar';
   const { hasPermission } = useAuth();
   
-  const [purchases, setPurchases] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [purchases, setPurchases] = useState<any[]>(() => cacheGet(CACHE_KEYS.PURCHASES) || []);
+  const [loading, setLoading] = useState(() => !cacheGet(CACHE_KEYS.PURCHASES));
   const [error, setError] = useState('');
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,27 +74,38 @@ const PurchasesList = () => {
     }
   };
 
-  const fetchPurchases = async () => {
+  const fetchPurchases = async (forceRefresh = false) => {
     try {
-      setLoading(true);
-      
-      let query = supabase
-        .from('purchases')
-        .select(`
-          *,
-          supplier:suppliers(name),
-          warehouse:warehouses(name)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (debouncedSearchTerm) {
-        query = query.or(`purchase_number.ilike.%${debouncedSearchTerm}%,invoice_number.ilike.%${debouncedSearchTerm}%`);
+      if (!cacheGet(CACHE_KEYS.PURCHASES) || forceRefresh) {
+        setLoading(true);
       }
-
-      const { data, error: fetchError } = await query;
       
-      if (fetchError) throw fetchError;
-      setPurchases(data || []);
+      const fetcher = async () => {
+        let query = supabase
+          .from('purchases')
+          .select(`
+            *,
+            supplier:suppliers(name),
+            warehouse:warehouses(name)
+          `)
+          .order('created_at', { ascending: false });
+
+        if (debouncedSearchTerm) {
+          query = query.or(`purchase_number.ilike.%${debouncedSearchTerm}%,invoice_number.ilike.%${debouncedSearchTerm}%`);
+        }
+
+        const { data, error: fetchError } = await query;
+        if (fetchError) throw fetchError;
+        return data || [];
+      };
+
+      if (!debouncedSearchTerm) {
+        const data = await fetchWithCache(CACHE_KEYS.PURCHASES, fetcher, { forceRefresh });
+        setPurchases(data);
+      } else {
+        const data = await fetcher();
+        setPurchases(data);
+      }
     } catch (err: any) {
       console.error('Error fetching purchases:', err);
       setError('Failed to load purchases.');
@@ -139,7 +151,11 @@ const PurchasesList = () => {
       }
       setDeleteConfirmId(null);
       setDeleteTargetPurchase(null);
-      fetchPurchases();
+      invalidateCache(CACHE_KEYS.PURCHASES);
+      invalidateCache(CACHE_KEYS.INVENTORY);
+      invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+      invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+      fetchPurchases(true);
     } catch (e: any) {
       setDeleteErrorMsg(e.message || (language === 'ar' ? 'فشل حذف الفاتورة' : 'Failed to delete purchase invoice'));
     } finally {
@@ -399,7 +415,11 @@ const PurchasesList = () => {
           onClose={() => setIsFormOpen(false)} 
           onSave={() => {
             setIsFormOpen(false);
-            fetchPurchases();
+            invalidateCache(CACHE_KEYS.PURCHASES);
+            invalidateCache(CACHE_KEYS.INVENTORY);
+            invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+            invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+            fetchPurchases(true);
           }} 
         />
       )}
@@ -408,7 +428,13 @@ const PurchasesList = () => {
         <PurchaseDetails 
           purchaseId={selectedPurchase.id}
           onClose={() => setIsDetailsOpen(false)}
-          onRefresh={() => fetchPurchases()}
+          onRefresh={() => {
+            invalidateCache(CACHE_KEYS.PURCHASES);
+            invalidateCache(CACHE_KEYS.INVENTORY);
+            invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+            invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+            fetchPurchases(true);
+          }}
         />
       )}
 

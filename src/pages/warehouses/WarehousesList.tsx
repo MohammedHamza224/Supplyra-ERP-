@@ -5,13 +5,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Building, Plus, Edit2, Trash2, Search, Building2, X, CheckCircle, XCircle } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
+import { cacheGet, fetchWithCache, invalidateCache, CACHE_KEYS } from '../../lib/dataCache';
 
 const WarehousesList = () => {
   const { t, language } = useTranslation();
   const isRtl = language === 'ar';
   const { hasPermission } = useAuth();
-  const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [warehouses, setWarehouses] = useState<any[]>(() => cacheGet(CACHE_KEYS.WAREHOUSES) || []);
+  const [loading, setLoading] = useState(() => !cacheGet(CACHE_KEYS.WAREHOUSES));
   const [fetchError, setFetchError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -36,47 +37,46 @@ const WarehousesList = () => {
     fetchWarehouses();
   }, [debouncedSearchTerm]);
 
-  const fetchWarehouses = async () => {
+  const fetchWarehouses = async (forceRefresh = false) => {
     try {
-      setLoading(true);
+      if (!cacheGet(CACHE_KEYS.WAREHOUSES) || forceRefresh) {
+        setLoading(true);
+      }
       setFetchError('');
       
-      // Step 1: Safe dynamic select
-      let { data, error } = await supabase
-        .from('warehouses')
-        .select('*')
-        .order('name');
-
-      if (error) {
-        console.warn('Full warehouses select notice, falling back to base columns:', error.message);
-        const fallback = await supabase
+      const fetcher = async () => {
+        let { data, error } = await supabase
           .from('warehouses')
-          .select('id, code, name, location')
+          .select('*')
           .order('name');
-        if (fallback.error) throw fallback.error;
-        data = fallback.data;
-      }
-      
-      if (!data) {
-         setWarehouses([]);
-         return;
-      }
 
-      // Memory filter for search term
-      let processedData = [...data];
-      if (debouncedSearchTerm) {
+        if (error) {
+          console.warn('Full warehouses select notice, falling back to base columns:', error.message);
+          const fallback = await supabase
+            .from('warehouses')
+            .select('id, code, name, location')
+            .order('name');
+          if (fallback.error) throw fallback.error;
+          data = fallback.data;
+        }
+        
+        return (data || []).filter((w: any) => w.active !== false);
+      };
+
+      let processedData: any[];
+      if (!debouncedSearchTerm) {
+        processedData = await fetchWithCache(CACHE_KEYS.WAREHOUSES, fetcher, { forceRefresh });
+      } else {
+        const full = await fetcher();
         const term = debouncedSearchTerm.toLowerCase();
-        processedData = processedData.filter((w: any) =>
+        processedData = full.filter((w: any) =>
           (w.name && w.name.toLowerCase().includes(term)) ||
           (w.code && w.code.toLowerCase().includes(term)) ||
           (w.location && w.location.toLowerCase().includes(term))
         );
       }
 
-      // Filter out explicitly deactivated warehouses if active column is present
-      processedData = processedData.filter((w: any) => w.active !== false);
-
-      setWarehouses(processedData);
+      setWarehouses(processedData || []);
     } catch (error: any) {
       console.error('Error fetching warehouses:', error);
       setFetchError(error?.message || 'Failed to load warehouses');

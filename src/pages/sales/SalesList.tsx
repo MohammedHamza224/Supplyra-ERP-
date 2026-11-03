@@ -10,6 +10,8 @@ import SalesAnalytics from './SalesAnalytics';
 import DiscountApprovalModal from './DiscountApprovalModal';
 import { useDebounce } from '../../hooks/useDebounce';
 import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
+import { cacheGet, fetchWithCache, invalidateCache, CACHE_KEYS } from '../../lib/dataCache';
+import { MasterDataService } from '../../services/masterDataService';
 
 const SalesList = () => {
   const { t, language } = useTranslation();
@@ -21,8 +23,8 @@ const SalesList = () => {
     return searchParams.get('view') === 'analytics' ? 'analytics' : 'list';
   });
 
-  const [sales, setSales] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sales, setSales] = useState<any[]>(() => cacheGet(CACHE_KEYS.SALES) || []);
+  const [loading, setLoading] = useState(() => !cacheGet(CACHE_KEYS.SALES));
   const [error, setError] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -93,74 +95,84 @@ const SalesList = () => {
     }
   };
 
-  const fetchSales = async () => {
+  const fetchSales = async (forceRefresh = false) => {
     try {
-      setLoading(true);
+      if (!cacheGet(CACHE_KEYS.SALES) || forceRefresh) {
+        setLoading(true);
+      }
       setError('');
 
-      let query = supabase
-        .from('orders')
-        .select(`
-          *,
-          customer:customers(name, phone),
-          warehouse:warehouses(id, name),
-          order_items(warehouse_id, warehouse:warehouses(name))
-        `)
-        .order('created_at', { ascending: false });
-
-      if (debouncedSearchTerm) {
-        query = query.ilike('order_number', `%${debouncedSearchTerm}%`);
-      }
-
-      let { data, error: fetchError } = await query;
-
-      if (fetchError) {
-        console.warn('Failed to fetch orders with relations, falling back to safe fetch:', fetchError);
-        let fallbackQuery = supabase
+      const fetcher = async () => {
+        let query = supabase
           .from('orders')
-          .select('*')
+          .select(`
+            *,
+            customer:customers(name, phone),
+            warehouse:warehouses(id, name),
+            order_items(warehouse_id, warehouse:warehouses(name))
+          `)
           .order('created_at', { ascending: false });
 
         if (debouncedSearchTerm) {
-          fallbackQuery = fallbackQuery.ilike('order_number', `%${debouncedSearchTerm}%`);
+          query = query.ilike('order_number', `%${debouncedSearchTerm}%`);
         }
 
-        const fallbackRes = await fallbackQuery;
-        data = fallbackRes.data;
-        fetchError = fallbackRes.error;
-        
-        if (fetchError) throw fetchError;
+        let { data, error: fetchError } = await query;
+
+        if (fetchError) {
+          console.warn('Failed to fetch orders with relations, falling back to safe fetch:', fetchError);
+          let fallbackQuery = supabase
+            .from('orders')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (debouncedSearchTerm) {
+            fallbackQuery = fallbackQuery.ilike('order_number', `%${debouncedSearchTerm}%`);
+          }
+
+          const fallbackRes = await fallbackQuery;
+          data = fallbackRes.data;
+          fetchError = fallbackRes.error;
+          
+          if (fetchError) throw fetchError;
+        }
+
+        const warehousesList = await MasterDataService.getWarehouses();
+        const warehouseMap = new Map((warehousesList || []).map((w: any) => [w.id, w.name]));
+        const defaultWarehouseName = warehousesList && warehousesList.length > 0 ? warehousesList[0].name : '-';
+
+        return (data || []).map((sale: any) => {
+          let whName = sale.warehouse?.name;
+          if (!whName && sale.warehouse_id) {
+            whName = warehouseMap.get(sale.warehouse_id);
+          }
+          if (!whName && sale.order_items && sale.order_items.length > 0) {
+            const itemWh = sale.order_items[0];
+            whName = itemWh.warehouse?.name || (itemWh.warehouse_id ? warehouseMap.get(itemWh.warehouse_id) : null);
+          }
+          if (!whName) {
+            whName = defaultWarehouseName;
+          }
+          return {
+            ...sale,
+            grand_total: Number(sale.grand_total || sale.total_amount || 0),
+            order_date: sale.order_date || sale.created_at,
+            customer: sale.customer ? {
+              ...sale.customer,
+              mobile: sale.customer.phone || sale.customer.mobile
+            } : null,
+            warehouse_name_display: whName || '-'
+          };
+        });
+      };
+
+      if (!debouncedSearchTerm) {
+        const enrichedSales = await fetchWithCache(CACHE_KEYS.SALES, fetcher, { forceRefresh });
+        setSales(enrichedSales);
+      } else {
+        const enrichedSales = await fetcher();
+        setSales(enrichedSales);
       }
-
-      const { data: warehousesList } = await supabase.from('warehouses').select('id, name');
-      const warehouseMap = new Map((warehousesList || []).map((w: any) => [w.id, w.name]));
-      const defaultWarehouseName = warehousesList && warehousesList.length > 0 ? warehousesList[0].name : '-';
-
-      const enrichedSales = (data || []).map((sale: any) => {
-        let whName = sale.warehouse?.name;
-        if (!whName && sale.warehouse_id) {
-          whName = warehouseMap.get(sale.warehouse_id);
-        }
-        if (!whName && sale.order_items && sale.order_items.length > 0) {
-          const itemWh = sale.order_items[0];
-          whName = itemWh.warehouse?.name || (itemWh.warehouse_id ? warehouseMap.get(itemWh.warehouse_id) : null);
-        }
-        if (!whName) {
-          whName = defaultWarehouseName;
-        }
-        return {
-          ...sale,
-          grand_total: Number(sale.grand_total || sale.total_amount || 0),
-          order_date: sale.order_date || sale.created_at,
-          customer: sale.customer ? {
-            ...sale.customer,
-            mobile: sale.customer.phone || sale.customer.mobile
-          } : null,
-          warehouse_name_display: whName || '-'
-        };
-      });
-      
-      setSales(enrichedSales);
     } catch (err: any) {
       console.error('Error fetching sales:', err);
       setError(err?.message || 'Failed to load sales.');
@@ -191,19 +203,36 @@ const SalesList = () => {
   const closeForm = (shouldRefresh = false) => {
     setIsFormOpen(false);
     setSelectedSale(null);
-    if (shouldRefresh) fetchSales();
+    if (shouldRefresh) {
+      invalidateCache(CACHE_KEYS.SALES);
+      invalidateCache(CACHE_KEYS.INVENTORY);
+      invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+      invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+      fetchSales(true);
+    }
   };
 
   const closeDetails = (shouldRefresh = false) => {
     setIsDetailsOpen(false);
     setSelectedSale(null);
-    if (shouldRefresh) fetchSales();
+    if (shouldRefresh) {
+      invalidateCache(CACHE_KEYS.SALES);
+      invalidateCache(CACHE_KEYS.INVENTORY);
+      invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+      invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+      fetchSales(true);
+    }
   };
 
   const closeApprovalModal = (shouldRefresh = false) => {
     setIsApprovalModalOpen(false);
     setApprovalOrderId('');
-    if (shouldRefresh) fetchSales();
+    if (shouldRefresh) {
+      invalidateCache(CACHE_KEYS.SALES);
+      invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+      invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+      fetchSales(true);
+    }
   };
 
   const getStatusStyle = (status: string) => {
@@ -295,7 +324,11 @@ const SalesList = () => {
       setSales(prev => prev.filter(s => s.id !== deleteConfirmId));
       setDeleteConfirmId(null);
       setDeleteTargetSale(null);
-      await fetchSales();
+      invalidateCache(CACHE_KEYS.SALES);
+      invalidateCache(CACHE_KEYS.INVENTORY);
+      invalidateCache(CACHE_KEYS.DASHBOARD_PREFIX);
+      invalidateCache(CACHE_KEYS.ANALYTICS_PREFIX);
+      await fetchSales(true);
     } catch (e: any) {
       console.error('Error executing delete sale:', e);
       setDeleteErrorMsg(e.message || (language === 'ar' ? 'فشل حذف الفاتورة' : 'Failed to delete sale'));

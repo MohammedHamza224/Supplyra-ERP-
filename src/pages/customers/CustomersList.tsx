@@ -5,13 +5,14 @@ import { supabase } from '../../lib/supabase';
 import { Plus, Edit2, Trash2, Search, MapPin, X, Users, CheckCircle, Printer } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
 import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
+import { cacheGet, fetchWithCache, invalidateCache, CACHE_KEYS } from '../../lib/dataCache';
 
 const CustomersList = () => {
   const { t, language } = useTranslation();
   const isRtl = language === 'ar';
   const { hasPermission } = useAuth();
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [customers, setCustomers] = useState<any[]>(() => cacheGet(CACHE_KEYS.CUSTOMERS) || []);
+  const [loading, setLoading] = useState(() => !cacheGet(CACHE_KEYS.CUSTOMERS));
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -90,46 +91,53 @@ const CustomersList = () => {
     fetchCustomers();
   }, [debouncedSearchTerm]);
 
-  const fetchCustomers = async (showLoader = true) => {
+  const fetchCustomers = async (showLoader = true, forceRefresh = false) => {
     try {
       setFetchError(null);
-      if (showLoader) setLoading(true);
+      if (showLoader && (!cacheGet(CACHE_KEYS.CUSTOMERS) || forceRefresh)) {
+        setLoading(true);
+      }
       
-      // Step 1: Query customers base table safely without risk of missing join columns
-      let { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const fetcher = async () => {
+        let { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.warn('Customer query error, retrying safe select:', error.message);
-        const fallback = await supabase.from('customers').select('*');
-        if (fallback.error) throw fallback.error;
-        data = fallback.data || [];
-      }
-
-      // Step 2: Try to fetch locations separately and join in memory
-      try {
-        const { data: locs, error: locErr } = await supabase.from('customer_locations').select('*');
-        if (!locErr && locs && locs.length > 0) {
-          const locMap = new Map();
-          locs.forEach((l: any) => {
-            if (!locMap.has(l.customer_id)) locMap.set(l.customer_id, []);
-            locMap.get(l.customer_id).push(l);
-          });
-          data = (data || []).map((c: any) => ({
-            ...c,
-            customer_locations: locMap.get(c.id) || []
-          }));
+        if (error) {
+          console.warn('Customer query error, retrying safe select:', error.message);
+          const fallback = await supabase.from('customers').select('*');
+          if (fallback.error) throw fallback.error;
+          data = fallback.data || [];
         }
-      } catch (locErr) {
-        console.warn('Customer locations separate query notice:', locErr);
-      }
 
-      // Memory filtering for search
-      if (debouncedSearchTerm && data) {
+        try {
+          const { data: locs, error: locErr } = await supabase.from('customer_locations').select('*');
+          if (!locErr && locs && locs.length > 0) {
+            const locMap = new Map();
+            locs.forEach((l: any) => {
+              if (!locMap.has(l.customer_id)) locMap.set(l.customer_id, []);
+              locMap.get(l.customer_id).push(l);
+            });
+            data = (data || []).map((c: any) => ({
+              ...c,
+              customer_locations: locMap.get(c.id) || []
+            }));
+          }
+        } catch (locErr) {
+          console.warn('Customer locations separate query notice:', locErr);
+        }
+
+        return data || [];
+      };
+
+      let resultData: any[];
+      if (!debouncedSearchTerm) {
+        resultData = await fetchWithCache(CACHE_KEYS.CUSTOMERS, fetcher, { forceRefresh });
+      } else {
+        const full = await fetcher();
         const term = debouncedSearchTerm.toLowerCase();
-        data = data.filter((c: any) => 
+        resultData = full.filter((c: any) => 
           (c.name && c.name.toLowerCase().includes(term)) ||
           (c.phone && c.phone.includes(term)) ||
           (c.mobile && c.mobile.includes(term)) ||
@@ -138,7 +146,7 @@ const CustomersList = () => {
         );
       }
 
-      setCustomers(data || []);
+      setCustomers(resultData || []);
     } catch (error: any) {
       console.error('Error fetching customers:', error);
       setFetchError(`Failed to load customers: ${error.message || JSON.stringify(error)}`);
