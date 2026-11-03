@@ -148,7 +148,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
       {/* Sidebar - Responsive Drawer for Mobile/Tablet & Collapsible for Desktop */}
       <aside 
         style={{
-          width: isMobileOrTablet ? '280px' : (isDesktopCollapsed ? '78px' : '280px'),
+          width: isMobileOrTablet ? '280px' : (isDesktopCollapsed ? '72px' : '248px'),
           backgroundColor: 'var(--sidebar-bg)',
           color: 'white',
           display: 'flex',

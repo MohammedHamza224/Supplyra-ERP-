@@ -137,7 +137,7 @@ a:hover {
 
 .page-container {
   flex: 1;
-  padding: var(--spacing-6) var(--spacing-8);
+  padding: 16px 20px;
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
@@ -153,13 +153,19 @@ a:hover {
 
 @media (min-width: 640px) and (max-width: 1023px) {
   .page-container {
-    padding: 16px 20px;
+    padding: 14px 16px;
   }
 }
 
-@media (min-width: 1024px) and (max-width: 1366px) {
+@media (min-width: 1024px) and (max-width: 1440px) {
   .page-container {
-    padding: 18px 20px;
+    padding: 14px 16px;
+  }
+}
+
+@media (min-width: 1441px) {
+  .page-container {
+    padding: 18px 24px;
   }
 }
 
@@ -671,6 +677,22 @@ html, body, #root, .app-container {
   .mobile-cards-view {
     display: none !important;
   }
+}
+
+/* Inventory Table Desktop Full Visibility */
+.inventory-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+@media (min-width: 1024px) {
+  .inventory-table-container {
+    overflow-x: hidden !important;
+  }
+}
+
+.inventory-table tr:hover {
+  background-color: var(--color-background-hover, rgba(0, 0, 0, 0.02));
 }
 
 /* ============================================================================

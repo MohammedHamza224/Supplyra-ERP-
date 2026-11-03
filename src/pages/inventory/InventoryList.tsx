@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTranslation } from '../../contexts/LanguageContext';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Search, Plus, Edit2, AlertTriangle, CircleCheck, Calendar, Clock, Package, Building2, X, Printer } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Search, Plus, Edit2, Calendar, Clock, Package, Building2, X, Printer } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDebounce } from '../../hooks/useDebounce';
 import { DocumentPrintModal } from '../../components/common/DocumentPrintModal';
@@ -387,10 +387,10 @@ const InventoryList = () => {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '5px',
-          padding: '2px 8px',
-          borderRadius: '12px',
-          fontSize: '0.72rem',
+          gap: '3px',
+          padding: '1px 5px',
+          borderRadius: '10px',
+          fontSize: '0.68rem',
           fontWeight: 600,
           backgroundColor: bg,
           color: color,
@@ -399,8 +399,8 @@ const InventoryList = () => {
       >
         <span
           style={{
-            width: '5px',
-            height: '5px',
+            width: '4px',
+            height: '4px',
             borderRadius: '50%',
             backgroundColor: color,
             flexShrink: 0,
@@ -697,23 +697,37 @@ const InventoryList = () => {
             </select>
           </div>
 
-          {/* Desktop Table View (>= 768px) */}
-          <div className="desktop-table-view table-responsive">
-            <table className="table" style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
+          {/* Desktop Table View (>= 768px) - 100% Fit, Zero Horizontal Scroll */}
+          <div className="desktop-table-view inventory-table-container">
+            <table className="table inventory-table" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', margin: 0, textAlign: isRtl ? 'right' : 'left' }}>
+              <colgroup>
+                {!productId && <col style={{ width: '7.5%' }} />}
+                {!productId && <col style={{ width: '19.0%' }} />}
+                <col style={{ width: productId ? '12.0%' : '8.5%' }} />
+                <col style={{ width: productId ? '15.0%' : '12.0%' }} />
+                <col style={{ width: productId ? '7.0%' : '5.0%' }} />
+                <col style={{ width: productId ? '10.0%' : '7.0%' }} />
+                <col style={{ width: productId ? '12.0%' : '8.5%' }} />
+                <col style={{ width: productId ? '12.0%' : '8.5%' }} />
+                <col style={{ width: productId ? '9.0%' : '6.5%' }} />
+                <col style={{ width: productId ? '11.0%' : '8.0%' }} />
+                <col style={{ width: productId ? '8.0%' : '6.0%' }} />
+                <col style={{ width: productId ? '4.0%' : '3.5%' }} />
+              </colgroup>
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-background)', textAlign: isRtl ? 'right' : 'left', height: '42px' }}>
-                  {!productId && <th style={{ padding: '10px 10px', width: '90px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.code')}</th>}
-                  {!productId && <th style={{ padding: '10px 12px', minWidth: '160px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('products.name')}</th>}
-                  <th style={{ padding: '10px 10px', width: '95px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('inventory.batchNumber')}</th>
-                  <th style={{ padding: '10px 10px', minWidth: '130px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{t('warehouses.title')}</th>
-                  <th style={{ padding: '10px 10px', width: '60px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'المتبقي' : 'Remaining'}</th>
-                  <th style={{ padding: '10px 10px', width: '80px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.cost')}</th>
-                  <th style={{ padding: '10px 10px', width: '100px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.productionDate')}</th>
-                  <th style={{ padding: '10px 10px', width: '95px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.expiryDate')}</th>
-                  <th style={{ padding: '10px 10px', width: '85px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.daysRemaining')}</th>
-                  <th style={{ padding: '10px 10px', width: '95px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.inventoryValue')}</th>
-                  <th style={{ padding: '10px 10px', width: '90px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.status')}</th>
-                  <th style={{ padding: '10px 10px', width: '45px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'تعديل' : 'Edit'}</th>
+                <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-surface)', textAlign: isRtl ? 'right' : 'left', height: '38px' }}>
+                  {!productId && <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('products.code')}</th>}
+                  {!productId && <th style={{ padding: '6px 6px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('products.name')}</th>}
+                  <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('inventory.batchNumber')}</th>
+                  <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('warehouses.title')}</th>
+                  <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'المتبقي' : 'Remaining'}</th>
+                  <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.cost')} <span style={{ fontSize: '0.68rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>({t('products.currency') || (isRtl ? 'ر.س' : 'SAR')})</span></th>
+                  <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.productionDate')}</th>
+                  <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.expiryDate')}</th>
+                  <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.daysRemaining')}</th>
+                  <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right' }}>{t('inventory.inventoryValue')} <span style={{ fontSize: '0.68rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>({t('products.currency') || (isRtl ? 'ر.س' : 'SAR')})</span></th>
+                  <th style={{ padding: '6px 4px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{t('inventory.status')}</th>
+                  <th style={{ padding: '6px 2px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'center' }}>{isRtl ? 'تعديل' : 'Edit'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -750,20 +764,33 @@ const InventoryList = () => {
                       key={batch.id} 
                       style={{ 
                         borderBottom: '1px solid var(--color-border)', 
-                        height: '46px',
+                        height: '38px',
                         transition: 'background-color 0.15s ease' 
                       }}
                     >
                       {!productId && (
-                        <td style={{ padding: '8px 8px', width: '85px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                        <td 
+                          style={{ 
+                            padding: '4px 4px', 
+                            whiteSpace: 'nowrap', 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis', 
+                            verticalAlign: 'middle' 
+                          }}
+                          title={batch.product_code || ''}
+                        >
                           <span style={{ 
-                            fontSize: '0.72rem', 
+                            fontSize: '0.7rem', 
                             fontFamily: 'monospace', 
                             backgroundColor: 'var(--color-background)', 
                             border: '1px solid var(--color-border)',
-                            padding: '2px 6px', 
+                            padding: '1px 4px', 
                             borderRadius: '4px',
-                            color: 'var(--color-text-primary)'
+                            color: 'var(--color-text-primary)',
+                            display: 'inline-block',
+                            maxWidth: '100%',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
                           }}>
                             {batch.product_code || '-'}
                           </span>
@@ -772,59 +799,79 @@ const InventoryList = () => {
                       {!productId && (
                         <td 
                           style={{ 
-                            padding: '10px 12px', 
-                            minWidth: '160px', 
+                            padding: '4px 6px', 
                             whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                             verticalAlign: 'middle'
                           }}
                           title={batch.product_name || ''}
                         >
-                          <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--color-text-primary)' }}>
+                          <span style={{ 
+                            fontWeight: 600, 
+                            fontSize: '0.78rem', 
+                            color: 'var(--color-text-primary)',
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
                             {batch.product_name || '-'}
                           </span>
                         </td>
                       )}
-                      <td style={{ padding: '8px 8px', width: '90px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                      <td 
+                        style={{ 
+                          padding: '4px 4px', 
+                          whiteSpace: 'nowrap', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis', 
+                          verticalAlign: 'middle' 
+                        }}
+                        title={batch.batch_number}
+                      >
                         <span style={{ 
-                          fontSize: '0.72rem', 
+                          fontSize: '0.7rem', 
                           fontFamily: 'monospace', 
                           backgroundColor: 'var(--color-background)', 
                           border: '1px solid var(--color-border)',
-                          padding: '2px 6px', 
+                          padding: '1px 4px', 
                           borderRadius: '4px',
-                          color: 'var(--color-text-primary)'
+                          color: 'var(--color-text-primary)',
+                          display: 'inline-block',
+                          maxWidth: '100%',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
                         }}>
                           {batch.batch_number}
                         </span>
                       </td>
                       <td 
                         style={{ 
-                          padding: '10px 10px', 
-                          minWidth: '130px',
+                          padding: '4px 4px', 
                           whiteSpace: 'nowrap', 
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
                           verticalAlign: 'middle' 
                         }}
                         title={batch.warehouse_name || ''}
                       >
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
-                          <Building2 size={14} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />
-                          <span>{batch.warehouse_name || '-'}</span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.76rem', color: 'var(--color-text-secondary)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <Building2 size={12} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{batch.warehouse_name || '-'}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '8px 8px', width: '50px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      <td style={{ padding: '4px 4px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                           {batch.quantity}
                         </span>
                       </td>
-                      <td style={{ padding: '8px 8px', width: '75px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right', verticalAlign: 'middle' }}>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      <td style={{ padding: '4px 4px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right', verticalAlign: 'middle' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                           {Number(batch.purchase_price).toFixed(2)}
                         </span>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', marginInlineStart: '2px' }}>
-                          {t('products.currency')}
-                        </span>
                       </td>
-                      <td style={{ padding: '8px 8px', width: '90px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '4px 4px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
                         <button
                           type="button"
                           onClick={() => handleOpenEditModal(batch)}
@@ -833,21 +880,22 @@ const InventoryList = () => {
                             background: 'none',
                             border: 'none',
                             cursor: 'pointer',
-                            padding: '2px 4px',
-                            fontSize: '0.78rem',
+                            padding: '1px 3px',
+                            fontSize: '0.75rem',
                             color: 'var(--color-text-primary)',
                             display: 'inline-flex',
                             alignItems: 'center',
+                            justifyContent: 'center',
                             gap: '3px',
                             borderRadius: '4px'
                           }}
                         >
-                          <Calendar size={12} color="var(--color-primary)" />
-                          <span style={{ fontWeight: 500 }}>{batch.production_date || '-'}</span>
+                          <Calendar size={11} color="var(--color-primary)" />
+                          <span style={{ fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{batch.production_date || '-'}</span>
                         </button>
                       </td>
-                      <td style={{ padding: '8px 8px', width: '85px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
+                      <td style={{ padding: '4px 4px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                           {batch.expiry_date}
                         </span>
                       </td>
@@ -860,14 +908,14 @@ const InventoryList = () => {
 
                         return (
                           <td style={{ 
-                            padding: '8px 8px', 
-                            width: '75px', 
-                            fontSize: '0.78rem', 
+                            padding: '4px 4px', 
+                            fontSize: '0.75rem', 
                             fontWeight: 600, 
                             color: isExpired || isToday ? '#dc2626' : isSoon ? '#d97706' : 'var(--color-text-secondary)', 
                             whiteSpace: 'nowrap', 
                             textAlign: 'center',
-                            verticalAlign: 'middle' 
+                            verticalAlign: 'middle',
+                            fontVariantNumeric: 'tabular-nums' 
                           }}>
                             {!hasDays
                               ? '-'
@@ -879,26 +927,23 @@ const InventoryList = () => {
                           </td>
                         );
                       })()}
-                      <td style={{ padding: '8px 8px', width: '85px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right', verticalAlign: 'middle' }}>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+                      <td style={{ padding: '4px 4px', whiteSpace: 'nowrap', textAlign: isRtl ? 'left' : 'right', verticalAlign: 'middle' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-primary)', fontVariantNumeric: 'tabular-nums' }}>
                           {Number(batch.inventory_value).toFixed(2)}
                         </span>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', marginInlineStart: '2px' }}>
-                          {t('products.currency')}
-                        </span>
                       </td>
-                      <td style={{ padding: '8px 8px', width: '80px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '4px 4px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
                         {getStatusBadge(batch.expiry_status)}
                       </td>
-                      <td style={{ padding: '8px 8px', width: '45px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '4px 2px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
                         <button
                           type="button"
                           onClick={() => handleOpenEditModal(batch)}
                           style={{
                             background: 'none',
                             border: '1px solid var(--color-border)',
-                            borderRadius: '6px',
-                            padding: '4px 6px',
+                            borderRadius: '4px',
+                            padding: '3px 5px',
                             cursor: 'pointer',
                             color: 'var(--color-primary)',
                             display: 'inline-flex',
@@ -908,7 +953,7 @@ const InventoryList = () => {
                           }}
                           title={isRtl ? 'تعديل الدفعة وتاريخ الإنتاج' : 'Edit batch and dates'}
                         >
-                          <Edit2 size={13} />
+                          <Edit2 size={12} />
                         </button>
                       </td>
                     </tr>
