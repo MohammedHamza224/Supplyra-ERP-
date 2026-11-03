@@ -5,6 +5,7 @@ import AppShell from './components/layout/AppShell';
 import Login from './pages/Login';
 import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Lazy Loaded Route Chunks for Maximum Initial Load Speed & Performance
 const ProductsList = lazy(() => import('./pages/products/ProductsList'));
@@ -66,7 +67,7 @@ function App() {
           <Route path="/login" element={<LoginRoute />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           
-          <Route path="/" element={<AuthGuard><AppShell><Suspense fallback={<PageLoader />}><Outlet /></Suspense></AppShell></AuthGuard>}>
+          <Route path="/" element={<AuthGuard><AppShell><ErrorBoundary><Suspense fallback={<PageLoader />}><Outlet /></Suspense></ErrorBoundary></AppShell></AuthGuard>}>
             <Route index element={<Dashboard />} />
             
             <Route element={<ProtectedRoute requiredPermission="products.view" />}>

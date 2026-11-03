@@ -64,6 +64,7 @@ export default function AnalyticsDashboard() {
   const [lowStockProducts, setLowStockProducts] = useState<any[]>(() => initialCache?.lowStockProducts || []);
   const [expiringBatches, setExpiringBatches] = useState<any[]>(() => initialCache?.expiringBatches || []);
   const [insights, setInsights] = useState<BusinessInsight[]>(() => initialCache?.insights || []);
+  const [printModalData, setPrintModalData] = useState<any>(null);
 
   useEffect(() => {
     fetchAnalytics();
@@ -474,8 +475,6 @@ export default function AnalyticsDashboard() {
       </div>
     );
   }
-
-  const [printModalData, setPrintModalData] = useState<any>(null);
 
   const handlePrintAnalytics = () => {
     const items = topProducts.map(p => ({
